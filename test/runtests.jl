@@ -1,6 +1,4 @@
-using ClearSky
-using Test
+using AtmosphericRadiation, Test, SpecialFunctions
 
-@testset "ClearSky.jl" begin
-    # Write your tests here.
-end
+@testset "Faddeeva" begin include("test_faddeeva.jl") end
+@testset "Molparam" begin include("test_molparam.jl") end
