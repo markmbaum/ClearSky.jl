@@ -167,6 +167,19 @@ Evaluate doppler (gaussian) absoption cross-section [cm``^2``/molecule]
 """
 doppler(ν, νl, S, α)::Float64 = S*fdoppler(ν, νl, α)
 
+"""
+    doppler(ν, sl, T, P, Pₚ, Δνcut=25)
+
+Evaluate a single doppler (gaussian) absoption cross-section [cm``^2``/molecule]. Temperature scaling and doppler profiles are evaluated along the way.
+
+# Arguments
+* `ν`: wavenumber indicating where to evaluate [cm``^{-1}``]
+* `sl`: [`SpectralLines`](@ref)
+* `T`: temperature [K]
+* `P`: air pressure [Pa]
+* `Pₚ`: partial pressure [Pa]
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
+"""
 function doppler(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)::Float64
     i = includedlines(ν, sl.ν, Δνcut)
     S = scaleintensity(sl, i, T)
@@ -177,16 +190,7 @@ end
 """
     doppler!(σ, ν, sl, T, P, Pₚ, Δνcut=25)
 
-Compute a vector of doppler (gaussian) absorption cross-sections [cm``^2``/molecule] in-place from a [`SpectralLines`](@ref) object. Temperature scaling and doppler profiles are evaluated along the way.
-
-# Arguments
-* `σ`: vector to store cross-sections [cm``^2``/molecule]
-* `ν`: vector of wavenumbers indicating where to evaluate [cm``^{-1}``]
-* `sl`: [`SpectralLines`](@ref)
-* `T`: temperature [K]
-* `P`: air pressure [Pa]
-* `Pₚ`: partial pressure [Pa]
-* `Δνcut`: profile truncation distance [cm``^{-1}``]
+Identical to [`doppler`](@ref), but fills the vector of cross-sections (`σ`) in-place.
 """
 function doppler!(σ::AbstractVector,
                   ν::AbstractVector,
@@ -204,7 +208,15 @@ end
 """
     doppler(ν, sl, T, P, Pₚ, Δνcut=25)
 
-Identical to [`doppler!`], but allocates and returns a new vector of cross-sections.
+Compute a vector of doppler (gaussian) absorption cross-sections [cm``^2``/molecule] from a [`SpectralLines`](@ref) object. Temperature scaling and doppler profiles are evaluated along the way.
+
+# Arguments
+* `ν`: vector of wavenumbers indicating where to evaluate [cm``^{-1}``]
+* `sl`: [`SpectralLines`](@ref)
+* `T`: temperature [K]
+* `P`: air pressure [Pa]
+* `Pₚ`: partial pressure [Pa]
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
 """
 function doppler(ν::AbstractVector,
                  sl::SpectralLines,
@@ -244,7 +256,7 @@ function γlorentz(sl::SpectralLines, i::Vector{Int64}, T, P, Pₚ)::Vector{Floa
 end
 
 """
-    florentz(ν, νl, α)
+    florentz(ν, νl, γ)
 
 Evaluate lorentz profile
 
@@ -256,7 +268,7 @@ Evaluate lorentz profile
 florentz(ν, νl, γ)::Float64 = γ/(π*((ν - νl)*(ν - νl) + γ*γ))
 
 """
-    lorentz(ν, νl, S, α)
+    lorentz(ν, νl, S, γ)
 
 Evaluate lorentzian absoption cross-section [cm``^2``/molecule]
 
@@ -268,6 +280,19 @@ Evaluate lorentzian absoption cross-section [cm``^2``/molecule]
 """
 lorentz(ν, νl, S, γ)::Float64 = S*florentz(ν, νl, γ)
 
+"""
+    lorentz(ν, sl, T, P, Pₚ, Δνcut=25)
+
+Compute a single lorentzian absorption cross-sections [cm``^2``/molecule] from a [`SpectralLines`](@ref) object. Temperature scaling and lorentzian profiles are evaluated along the way.
+
+# Arguments
+* `ν`: single wavenumber indicating where to evaluate [cm``^{-1}``]
+* `sl`: [`SpectralLines`](@ref)
+* `T`: temperature [K]
+* `P`: air pressure [Pa]
+* `Pₚ`: partial pressure [Pa]
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
+"""
 function lorentz(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)::Float64
     i = includedlines(ν, sl.ν, Δνcut)
     S = scaleintensity(sl, i, T)
@@ -278,16 +303,7 @@ end
 """
     lorentz!(σ, ν, sl, T, P, Pₚ, Δνcut=25)
 
-Compute a vector of lorentzian absorption cross-sections [cm``^2``/molecule] in-place from a [`SpectralLines`](@ref) object. Temperature scaling and lorentzian profiles are evaluated along the way.
-
-# Arguments
-* `σ`: vector to store cross-sections [cm``^2``/molecule]
-* `ν`: vector of wavenumbers indicating where to evaluate [cm``^{-1}``]
-* `sl`: [`SpectralLines`](@ref)
-* `T`: temperature [K]
-* `P`: air pressure [Pa]
-* `Pₚ`: partial pressure [Pa]
-* `Δνcut`: profile truncation distance [cm``^{-1}``]
+Identical to [`lorentz`](@ref), fills the vector of cross-sections (`σ`) in-place.
 """
 function lorentz!(σ::AbstractVector,
                   ν::AbstractVector,
@@ -305,7 +321,15 @@ end
 """
     lorentz(ν, sl, T, P, Pₚ, Δνcut=25)
 
-Identical to [`lorentz!`], but allocates and returns a new vector of cross-sections.
+Compute a vector of lorentzian absorption cross-sections [cm``^2``/molecule] from a [`SpectralLines`](@ref) object. Temperature scaling and lorentzian profiles are evaluated along the way.
+
+# Arguments
+* `ν`: vector of wavenumbers indicating where to evaluate [cm``^{-1}``]
+* `sl`: [`SpectralLines`](@ref)
+* `T`: temperature [K]
+* `P`: air pressure [Pa]
+* `Pₚ`: partial pressure [Pa]
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
 """
 function lorentz(ν::AbstractVector,
                  sl::SpectralLines,
@@ -324,7 +348,7 @@ end
 export fvoigt, voigt, voigt!
 
 """
-    fvoigt(ν, νl, α)
+    fvoigt(ν, νl, α, γ)
 
 Evaluate Voigt profile
 
@@ -349,7 +373,7 @@ function fvoigt(ν, νl, α, γ)::Float64
 end
 
 """
-    voigt(ν, νl, S, α)
+    voigt(ν, νl, S, α, γ)
 
 Evaluate Voigt absoption cross-section [cm``^2``/molecule]
 
@@ -362,6 +386,11 @@ Evaluate Voigt absoption cross-section [cm``^2``/molecule]
 """
 voigt(ν, νl, S, α, γ)::Float64 = S*fvoigt(ν, νl, α, γ)
 
+"""
+    voigt(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25)
+
+Evaluate Voigt absorption cross-section at a single wavenumber.
+"""
 function voigt(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)::Float64
     i = includedlines(ν, sl.ν, Δνcut)
     S = scaleintensity(sl, i, T)
@@ -373,16 +402,7 @@ end
 """
     voigt!(σ, ν, sl, T, P, Pₚ, Δνcut=25)
 
-Compute a vector of Voigt absorption cross-sections [cm``^2``/molecule] in-place from a [`SpectralLines`](@ref) object. Temperature scaling and Voigt profiles are evaluated along the way.
-
-# Arguments
-* `σ`: vector to store cross-sections [cm``^2``/molecule]
-* `ν`: vector of wavenumbers indicating where to evaluate [cm``^{-1}``]
-* `sl`: [`SpectralLines`](@ref)
-* `T`: temperature [K]
-* `P`: air pressure [Pa]
-* `Pₚ`: partial pressure [Pa]
-* `Δνcut`: profile truncation distance [cm``^{-1}``]
+Identical to [`voigt`](@ref), but fills the vector of cross-sections (`σ`) in-place.
 """
 function voigt!(σ::AbstractVector,
                 ν::AbstractVector,
@@ -401,7 +421,15 @@ end
 """
     voigt(ν, sl, T, P, Pₚ, Δνcut=25)
 
-Identical to [`voigt!`], but allocates and returns a new vector of cross-sections.
+Compute a vector of Voigt absorption cross-sections [cm``^2``/molecule] from a [`SpectralLines`](@ref) object. Temperature scaling and Voigt profiles are evaluated along the way.
+
+# Arguments
+* `ν`: vector of wavenumbers indicating where to evaluate [cm``^{-1}``]
+* `sl`: [`SpectralLines`](@ref)
+* `T`: temperature [K]
+* `P`: air pressure [Pa]
+* `Pₚ`: partial pressure [Pa]
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
 """
 function voigt(ν::AbstractVector,
                sl::SpectralLines,
@@ -465,6 +493,19 @@ function PHCO2(ν, νl, T, S, α, γ)::Float64
     voigt(ν, νl, S, α, Χ*γ)
 end
 
+"""
+    PHCO2(ν, sl, T, P, Pₚ, Δνcut=500)
+
+Compute a single Perrin & Hartman sub-lorentzian CO2 absorption cross-sections [cm``^2``/molecule] from a [`SpectralLines`](@ref) object. Temperature scaling and profiles are evaluated along the way.
+
+# Arguments
+* `ν`: single wavenumber indicating where to evaluate [cm``^{-1}``]
+* `sl`: [`SpectralLines`](@ref)
+* `T`: temperature [K]
+* `P`: air pressure [Pa]
+* `Pₚ`: partial pressure [Pa]
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
+"""
 function PHCO2(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=500.0)::Float64
     i = includedlines(ν, sl.ν, Δνcut)
     S = scaleintensity(sl, i, T)
@@ -474,18 +515,9 @@ function PHCO2(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=500.0)::Float64
 end
 
 """
-    PHCO2!(σ, ν, sl, T, P, Pₚ, Δνcut=25)
+    PHCO2!(σ, ν, sl, T, P, Pₚ, Δνcut=500)
 
-Compute a vector of Perrin & Hartman sub-lorentzian CO2 absorption cross-sections [cm``^2``/molecule] in-place from a [`SpectralLines`](@ref) object. Temperature scaling and profiles are evaluated along the way.
-
-# Arguments
-* `σ`: vector to store cross-sections [cm``^2``/molecule]
-* `ν`: vector of wavenumbers indicating where to evaluate [cm``^{-1}``]
-* `sl`: [`SpectralLines`](@ref)
-* `T`: temperature [K]
-* `P`: air pressure [Pa]
-* `Pₚ`: partial pressure [Pa]
-* `Δνcut`: profile truncation distance [cm``^{-1}``]
+Identical to [`PHCO2`](@ref), but fills the vector of cross-sections (`σ`) in-place.
 """
 function PHCO2!(σ::AbstractVector,
                 ν::AbstractVector,
@@ -503,9 +535,17 @@ function PHCO2!(σ::AbstractVector,
 end
 
 """
-    PHCO2(ν, sl, T, P, Pₚ, Δνcut=25)
+    PHCO2(ν, sl, T, P, Pₚ, Δνcut=500)
 
-Identical to [`PHCO2!`], but allocates and returns a new vector of cross-sections.
+Compute a vector of Perrin & Hartman sub-lorentzian CO2 absorption cross-sections [cm``^2``/molecule] from a [`SpectralLines`](@ref) object. Temperature scaling and profiles are evaluated along the way.
+
+# Arguments
+* `ν`: vector of wavenumbers indicating where to evaluate [cm``^{-1}``]
+* `sl`: [`SpectralLines`](@ref)
+* `T`: temperature [K]
+* `P`: air pressure [Pa]
+* `Pₚ`: partial pressure [Pa]
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
 """
 function PHCO2(ν::AbstractVector,
                sl::SpectralLines,

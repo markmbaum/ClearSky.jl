@@ -388,7 +388,7 @@ end
 export CIA
 
 """
-Container for a `CIATables` object and the two gasses representing the CIA components. Specializes with the type of each gas for fast retreival of absorption cross-sections from CIA data and partial pressures.
+Container for a [`CIATables`](@ref) object and the two gasses representing the CIA components. Specializes with the type of each gas for fast retreival of absorption cross-sections from CIA data and partial pressures.
 
 | Field | Type | Description |
 | ----- | :--- | :---------- |
@@ -410,7 +410,7 @@ Using the formulae in `x`, the correct pair of gases is automatically selected f
 
 # Example
 
-A `CIA` object is [function-like](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects). Use it like a function, passing it wavenumber, temperature, and pressure arguments to compute an absorption cross-section. Underneath, the `CIATables` object is interpolated and partial pressures are computed using the concentrations stored with the gases.
+A `CIA` object is [function-like](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects). Use it like a function, passing it wavenumber, temperature, and pressure arguments to compute an absorption cross-section. Underneath, the [`CIATables`](@ref) object is interpolated and partial pressures are computed using the concentrations stored with the gases.
 
 ```julia
 #load gases
