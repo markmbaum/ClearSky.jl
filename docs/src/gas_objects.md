@@ -59,4 +59,6 @@ AtmosphericDomain
 OpacityTable
 WellMixedGas
 VariableGas
+concentration
+reconcentrate
 ```

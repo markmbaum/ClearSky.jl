@@ -16,7 +16,9 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Absorption Data" => "absorption_data.md",
-        "Line Shapes" => "line_shapes.md"
+        "Line Shapes" => "line_shapes.md",
+        "Gas Objects" => "gas_objects.md",
+        "Atmospheric Profiles" => "atmospheric_profiles.md"
     ],
 )
 

@@ -10,6 +10,11 @@ If you plan to compute line shapes directly, read par files into [`SpectralLines
 
 For only high-level calculations, `par` files can be loaded directly into gas objects, as described [[]]
 
+```@docs
+readpar
+SpectralLines
+```
+
 ## Collision Induced Absorption (CIA)
 
 The model also makes it easy to include CIA data from HITRAN. These files can be  [downloaded directly](https://hitran.org/cia/) or all at once using the [`download_cia.py`](https://github.com/wordsworthgroup/ClearSky.jl/blob/main/scripts/download_cia.py) script. Each file contains potentially many tables of absorption data at different wavenumbers and temperatures.
@@ -21,8 +26,6 @@ A [`CIATables`](@ref) object arranges each table of absorption data into an inte
 -----
 
 ```@docs
-readpar
-SpectralLines
 readcia
 CIATables
 ```

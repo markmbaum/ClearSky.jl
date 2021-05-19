@@ -192,6 +192,24 @@ meanmolarmass(sl::SpectralLines) = sum(sl.A .* sl.μ)/sum(sl.A)
 
 #-------------------------------
 
+"""
+Gas type for well mixed atmospheric constituents. Must be constructed from a `.par` file or a [`SpectralLines`](@ref) object.
+
+# Constructors
+
+    WellMixedGas(sl::SpectralLines, C, ν, Ω, shape!=voigt!)
+
+* `sl`: a [`SpectralLines`](@ref) object
+* `C`: molar concentration of the constituent [mole/mole]
+* `ν`: vector of wavenumber samples [cm``^{-1}``]
+* `Ω`: [`AtmosphericDomain`](@ref)
+* `shape!`: line shape to use, must be the in-place version ([`voigt!`](@ref), [`lorentz!`](@ref), etc.)
+
+
+    WellMixedGas(par::String, C, ν, Ω, shape!=voigt!; kwargs...)
+
+Same arguments as the first constructor, but reads a `par` file directly into the gas object. Keyword arguments are passed through to [`readpar`](@ref).
+"""
 struct WellMixedGas <: AbstractGas
     name::String
     formula::String
@@ -220,6 +238,24 @@ end
 
 #-------------------------------
 
+"""
+Gas type for variable concentration atmospheric constituents. Must be constructed from a `.par` file or a [`SpectralLines`](@ref) object.
+
+# Constructors
+
+    VariableGas(sl::SpectralLines, C, ν, Ω, shape!=voigt!)
+
+* `sl`: a [`SpectralLines`](@ref) object
+* `C`: molar concentration of the constituent [mole/mole] as a function of temperature and pressure `C(T,P)`
+* `ν`: vector of wavenumber samples [cm``^{-1}``]
+* `Ω`: [`AtmosphericDomain`](@ref)
+* `shape!`: line shape to use, must be the in-place version ([`voigt!`](@ref), [`lorentz!`](@ref), etc.)
+
+
+    VariableGas(par::String, C, ν, Ω, shape!=voigt!; kwargs...)
+
+Same arguments as the first constructor, but reads a `par` file directly into the gas object. Keyword arguments are passed through to [`readpar`](@ref).
+"""
 struct VariableGas{F} <: AbstractGas
     name::String
     formula::String
@@ -247,12 +283,31 @@ end
 
 #-------------------------------
 
+"""
+    concentration(g::WellMixedGas)
+
+Furnishes the molar concentration [mole/mole] of a [`WellMixedGas`](@ref) object. Identical to `g.C`.
+"""
 concentration(g::WellMixedGas) = g.C
 
 concentration(g::WellMixedGas, X...)::Float64 = g.C
 
+"""
+    concentration(g::VariableGas, T, P)
+
+Furnishes the molar concentration [mole/mole] of a [`VariableGas`](@ref) object at a particular temperature and pressure. Identical to `g.C(T,P)`.
+"""
 concentration(g::VariableGas, T, P)::Float64 = g.C(T,P)
 
+"""
+    reconcentrate(g::WellMixedGas, C)
+
+Create a copy of a [`WellMixedGas`](@ref) object with a different molar concentration, `C`, in mole/mole.
+
+!!! warning
+
+    Only reconcentrate gas objects with very low concentrations. The self-broadening component of the line shape is not recomputed when using the `reconcentrate` function. This component is very small when partial pressure is very low, but may be appreciable for bulk components.
+"""
 function reconcentrate(g::WellMixedGas, C::Real)::WellMixedGas
     @assert 0 <= C <= 1 "gas molar concentrations must be in [0,1], not $C"
     Ω = deepcopy(g.Ω)

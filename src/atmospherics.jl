@@ -26,7 +26,7 @@ scaleheight(g, μ, T)::Float64 = 𝐑*T/(μ*g)
 #parameterized hydrostatic relation in log coordinates
 function dlnPdz(z, lnP, param::Tuple)::Float64
     #unpack parameters
-    Pₛ, g, fμ, fT = param
+    Pₛ, g, fT, fμ = param
     #evaluate temperature and mean molar mass [kg/mole]
     P = exp(lnP)
     if P < PMIN
@@ -39,32 +39,57 @@ function dlnPdz(z, lnP, param::Tuple)::Float64
     -μ*g/(𝐑*T)
 end
 
-#compute pressure at an altitude z->P, given parameters
-function hydrostatic(z, Pₛ, g, fμ::T, fT::U)::Float64 where {T,U}
+"""
+    hydrostatic(z, Pₛ, g, fT, fμ)
+
+Compute the hydrostatic pressure [Pa] at a specific altitude using arbitrary atmospheric profiles of temperature of mean molar mass
+
+# Arguments
+
+* `z`: altitude [m] to compute pressure at
+* `Pₛ`: surface pressure [Pa]
+* `g`: gravitational acceleration [m/s``^2``]
+* `fT`: temperature as a function of pressure, `fT(P)`
+* `fμ`: mean molar mass as a function of pressure and temperature `fμ(T,P)`
+"""
+function hydrostatic(z, Pₛ, g, fT::T, fμ::U)::Float64 where {T,U}
     @assert z >= 0 "cannot compute pressure at negative altitude $z m"
     @assert Pₛ > PMIN "pressure cannot be less than $PMIN Pa"
     #parameters
-    param = (Pₛ, g, fμ, fT)
+    param = (Pₛ, g, fT, fμ)
     #integrate in log coordinates
     lnP = radau(dlnPdz, log(Pₛ), 0, z, param)
     #convert
     exp(lnP)
 end
 
-function altitude(P, Pₛ, g, fμ::T, fT::U)::Float64 where {T,U}
+"""
+    altitude(P, Pₛ, g, fT, fμ)
+
+Compute the altitude [m] at which a specific hydrostatic pressure occurs using arbitrary atmospheric profiles of temperature of mean molar mass
+
+# Arguments
+
+* `P`: pressure [Pa] to compute altitude at
+* `Pₛ`: surface pressure [Pa]
+* `g`: gravitational acceleration [m/s``^2``]
+* `fT`: temperature as a function of pressure, `fT(P)`
+* `fμ`: mean molar mass as a function of pressure and temperature `fμ(T,P)`
+"""
+function altitude(P, Pₛ, g, fT::T, fμ::U)::Float64 where {T,U}
     #pressure decreases monotonically, find altitudes bracketing Pₜ
     z₁ = 0.0
     z₂ = 1e2
     P₁ = Pₛ
-    P₂ = hydrostatic(z₂, Pₛ, g, fμ, fT)
+    P₂ = hydrostatic(z₂, Pₛ, g, fT, fμ)
     while P₂ > P
         z₁ = z₂
         z₂ *= 2
         P₁ = P₂
-        P₂ = hydrostatic(z₂, Pₛ, g, fμ, fT)
+        P₂ = hydrostatic(z₂, Pₛ, g, fT, fμ)
     end
     #find precise altitude where P = Pₜ
-    falseposition(z -> log(hydrostatic(z, Pₛ, g, fμ, fT)) - log(P), z₁, z₂)
+    falseposition(z -> log(hydrostatic(z, Pₛ, g, fT, fμ)) - log(P), z₁, z₂)
 end
 
 """
@@ -72,13 +97,13 @@ end
 
 # Constructor
 
-    Hydrostatic(Pₛ, Pₜ, g, fμ, fT)
+    Hydrostatic(Pₛ, Pₜ, g, fT, fμ)
 
 * `Pₛ`: surface pressure [Pa]
 * `Pₜ`: top of profile pressure [Pa]
 * `g`: gravitational acceleration [m/s``^2``]
-* `fμ`: mean molar mass as a function of temperature and pressure, `fμ(T,P)`
 * `fT`: temperature as a function of presssure, `fT(P)`
+* `fμ`: mean molar mass as a function of temperature and pressure, `fμ(T,P)`
 
 For a constant molar mass or temperature, you can use [anonymous functions](https://docs.julialang.org/en/v1/manual/functions/#man-anonymous-functions) directly. For example, to construct a hydrostatic pressure profile for a crude Earth-like atmosphere:
 
@@ -86,7 +111,7 @@ For a constant molar mass or temperature, you can use [anonymous functions](http
 #moist adiabatic temperature profile
 M = MoistAdiabat(288, 1e5, 1040, 1996, 0.029, 0.018, 2.3e6, psatH2O, Ptropo=1e4);
 #hydrostatic pressure profile with constant mean molar mass
-H = Hydrostatic(1e5, 1, 9.8, (T,P)->0.029, M);
+H = Hydrostatic(1e5, 1, 9.8, M, (T,P)->0.029);
 #evaluate pressures at a few different altitudes
 H.([0, 1e3, 1e4])
 ```
@@ -96,14 +121,14 @@ struct Hydrostatic
     zₜ::Float64
 end
 
-function Hydrostatic(Pₛ, Pₜ, g, fμ::T, fT::U, N::Int=1000) where {T,U}
+function Hydrostatic(Pₛ, Pₜ, g, fT::T, fμ::U, N::Int=1000) where {T,U}
     #find the altitude corresponding to Pₜ
-    zₜ = altitude(Pₜ, Pₛ, g, fμ, fT)
+    zₜ = altitude(Pₜ, Pₛ, g, fT, fμ)
     #interpolation knots and output array
     z = logrange(0, zₜ, N)
     lnP = zeros(Float64, N)
     #integrate to get a full pressure profile
-    radau!(lnP, z, dlnPdz, log(Pₛ), 0, zₜ, (Pₛ, g, fμ, fT))
+    radau!(lnP, z, dlnPdz, log(Pₛ), 0, zₜ, (Pₛ, g, fT, fμ))
     #construct and return
     Hydrostatic(LinearInterpolator(z, lnP), zₜ)
 end
@@ -197,7 +222,7 @@ end
 
 # Constructor
 
-    MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F, Pₜ=$PMIN; Tstrat=0, Ptropo=0, N=1000)
+    MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat, Pₜ=$PMIN; Tstrat=0, Ptropo=0, N=1000)
 
 * `Tₛ`: surface temperature [K]
 * `Pₛ`: surface pressure [K]
