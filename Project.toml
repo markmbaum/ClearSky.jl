@@ -10,6 +10,7 @@ ScalarRadau = "52145ff8-3717-48bc-b8ab-44d3704098ee"
 
 [compat]
 ScalarRadau = "0.2"
+QuadGK = "2.4"
 julia = "1"
 
 [extras]
