@@ -15,12 +15,13 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
-        "Reading Absorption Data" => "reading_absorption_data.md",
-        "Computing Line Shapes" => "computing_line_shapes.md",
-        
+        "Absorption Data" => "absorption_data.md",
+        "Line Shapes" => "line_shapes.md"
     ],
 )
 
 deploydocs(;
     repo="github.com/wordsworthgroup/ClearSky.jl",
+    devbranch="main",
+    versions=["stable"=>"v^"]
 )

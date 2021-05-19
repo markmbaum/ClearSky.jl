@@ -7,3 +7,4 @@ Welcome to the documentation for `ClearSky`, a line-by-line radiative transfer m
 
 * [Reading Absorption Data](reading_absorption_data.md)
 * [Computing Line Shapes](computing_line_shapes.md)
+* [Gas Objects](gas_objects.md)

@@ -1,4 +1,4 @@
-# Reading Absorption Data
+# Absorption Data
 
 ## Spectral Lines
 

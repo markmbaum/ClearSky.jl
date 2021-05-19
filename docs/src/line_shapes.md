@@ -1,4 +1,4 @@
-# Computing Line Shapes
+# Line Shapes
 
 Line shapes are computed following the definitions and equations in [HITRAN](https://hitran.org/docs/definitions-and-units/) (and elsewhere).
 
