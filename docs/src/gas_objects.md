@@ -57,4 +57,6 @@ co2(600, 250, 1e4)
 ```@docs
 AtmosphericDomain
 OpacityTable
+WellMixedGas
+VariableGas
 ```
