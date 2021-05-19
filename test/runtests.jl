@@ -1,5 +1,8 @@
-using ClearSky, Test
+using ClearSky
+using Test
 using SpecialFunctions
 
-@testset "Faddeeva" begin include("test_faddeeva.jl") end
+using ClearSky: faddeyeva, MOLPARAM
+
+@testset "Faddeyeva" begin include("test_faddeyeva.jl") end
 @testset "Molparam" begin include("test_molparam.jl") end

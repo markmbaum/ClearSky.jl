@@ -23,7 +23,7 @@ Evaluating line shapes requires evaluating the [temperature dependence of line i
 
 ``Q(T_{ref})/Q(T)``
 
-must be evaluated. The necessary information is provided by HITRAN [for each isotopologue](https://hitran.org/docs/iso-meta/) and computing the ratio requires interpolating a range of ``Q(T)`` values for the appropriate temperature.
+must be evaluated. The necessary information is provided by HITRAN [for every isotopologue](https://hitran.org/docs/iso-meta/) and computing the ratio requires interpolating a range of ``Q(T)`` values for the appropriate temperature.
 
 `ClearSky` does this automatically. The [`molparam.py`](https://github.com/wordsworthgroup/ClearSky.jl/blob/main/scripts/molparam.py) script downloads Q data for each isotopologue, generates high-accuracy interpolating Chebyshev polynomials for each one, and writes an array with the information to a file in Julia syntax called [`molparam.jl`](https://github.com/wordsworthgroup/ClearSky.jl/blob/main/src/molparam.jl). These pre-computed interpolating coefficients are used directly as source code in the model, allowing rapid and accurate evaluation of the TIPS ratio. The interpolating functions are guaranteed to reproduce the provided data with less than 1 % error between 25 and 1000 K.
 

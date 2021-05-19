@@ -16,7 +16,8 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Reading Absorption Data" => "reading_absorption_data.md",
-
+        "Computing Line Shapes" => "computing_line_shapes.md",
+        
     ],
 )
 
