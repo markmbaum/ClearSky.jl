@@ -95,7 +95,14 @@ end
 
 #gets cross sections out of interpolators, un-logged, cm^2/molecule
 #also explicitly handles empty tables
-(Π::OpacityTable)(T, P)::Float64 = Π.emp ? 0.0 : exp(Π.itp(T, log(P)))
+function (Π::OpacityTable)(T, P)::Float64
+    if Π.emp
+        return 0.0
+    end
+    lnP = log(P)
+    lnσ = Π.itp(T, lnP)
+    return exp(lnσ)
+end
 
 #-------------------------------------------------------------------------------
 #function for building gas opacity tables

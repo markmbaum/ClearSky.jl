@@ -295,8 +295,8 @@ Compute a collision induced absorption cross-section
 """
 function cia(k, T, Pₐ, P₁, P₂)::Float64
     #number densities of gases, in amagats
-    ρ₁ = (P₁/𝐀)*(T0/T)
-    ρ₂ = (P₂/𝐀)*(T0/T)
+    ρ₁ = (P₁/𝐀)*(𝐓₀/T)
+    ρ₂ = (P₂/𝐀)*(𝐓₀/T)
     #number density of air, in molecules/cm^3
     ρₐ = 1e-6*Pₐ/(𝐤*T)
     #σ in cm^2/molecule, converting k from cm^5/molecule^2 to cm^-1/amagat^2

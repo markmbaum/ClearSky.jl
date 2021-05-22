@@ -118,3 +118,5 @@ where ``B_ν`` is [`planck`](@ref)'s law and ``N_A`` is Avogadro's number.
 * `T`: temperature [K]
 """
 schwarzschild(I, ν, σ, g, μ, T)::Float64 = 1e-4*σ*(𝐍𝐚/(μ*g))*(planck(ν,T) - I)
+
+#-------------------------------------------------------------------------------

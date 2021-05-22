@@ -43,11 +43,7 @@ function σgen(absorbers::Tuple, ν::Float64, T, P)::Float64
 end
 
 function (A::ParsedAbsorbers)(i, ν, T, P)::Float64
-    σ::Float64 = 0.0
-    σ += σgas(A.G, i, T, P)
-    σ += σgen(A.C, ν, T, P)
-    σ += σgen(A.F, ν, T, P)
-    return σ
+    σgas(A.G, i, T, P) + σgen(A.C, ν, T, P) + σgen(A.F, ν, T, P)
 end
 
 #-------------------------------------------------------------------------------
@@ -146,11 +142,11 @@ function dIdι(ι::Float64, I::Float64, param::Tuple)::Float64
 end
 
 #-------------------------------------------------------------------------------
-#internals to integrate up the atmosphere for an outgoing stream
+#internal to integrate up the atmosphere for an outgoing stream
 
 function outgoingstream(ω₁, #transformed pressure at start of integration
                         ω₂, #end of integration
-                        A, #ParsedAbsorbers
+                        A::ParsedAbsorbers,
                         i, #index for gas wavenumber and opaacity table
                         ν, #wavenumber [cm^-1]
                         g, #gravity [m/s^2]
@@ -167,12 +163,34 @@ function outgoingstream(ω₁, #transformed pressure at start of integration
     radau(dIdω, I₀, ω₁, ω₂, param, atol=tol, rtol=tol)
 end
 
+function outgoingstream!(I, #vector output irradiance
+                         ω, #vector output coordinates
+                         ω₁, #transformed pressure at start of integration
+                         ω₂, #end of integration
+                         A::ParsedAbsorbers,
+                         i, #index for gas wavenumber and opaacity table
+                         ν, #wavenumber [cm^-1]
+                         g, #gravity [m/s^2]
+                         m, #1/cos(θ), where θ is the stream angle
+                         fT::Q, #temperature profile fT(P)
+                         fμ::R, #mean molar mass as a function of T,P
+                         tol #integrator tolerance
+                         )::Float64 where {Q,R}
+    @assert length(I) == length(ω)
+    #initial intensity
+    I₀ = planck(ν, fT(ω2P(ω₁)))
+    #pack parameters
+    param = (A, i, ν, g, m, fT, fμ)
+    #integrate the Schwarzschild equation in log pressure coordinates and return
+    radau!(I, ω, dIdω, I₀, ω₁, ω₂, param, atol=tol, rtol=tol)
+end
+
 #-------------------------------------------------------------------------------
-#internals to integrate down the atmosphere for an incoming stream
+#internal to integrate down the atmosphere for an incoming stream
 
 function incomingstream(ι₁, #transformed pressure at start of integration
                         ι₂, #end of integration
-                        A, #ParsedAbsorbers
+                        A::ParsedAbsorbers,
                         i, #index for gas wavenumber and opaacity table
                         ν, #wavenumber [cm^-1]
                         g, #gravity [m/s^2]
@@ -190,9 +208,48 @@ function incomingstream(ι₁, #transformed pressure at start of integration
     radau(dIdι, I₀, ι₁, ι₂, param, atol=tol, rtol=tol)
 end
 
+function incomingstream!(I, #vector output irradiance
+                         ι, #output coordinates
+                         ι₁, #transformed pressure at start of integration
+                         ι₂, #end of integration
+                         A::ParsedAbsorbers,
+                         i, #index for gas wavenumber and opaacity table
+                         ν, #wavenumber [cm^-1]
+                         g, #gravity [m/s^2]
+                         m, #1/cos(θ), where θ is the stream angle
+                         fT::Q, #temperature profile fT(P)
+                         fμ::R, #mean molar mass as a function of T,P
+                         fI₀::S, #initial irradiance as a function of wavenumber fI₀(ν)
+                         tol #integrator tolerance
+                         )::Float64 where {Q,R,S}
+    #initial intensity
+    I₀ = fI₀(ν)
+    #pack parameters
+    param = (A, i, ν, g, m, fT, fμ)
+    #integrate
+    radau!(I, ι, dIdι, I₀, ι₁, ι₂, param, atol=tol, rtol=tol)
+end
+
 #-------------------------------------------------------------------------------
 export opticaldepth
 
+"""
+    opticaldepth(P₁, P₂, g, fT, fμ, θ, absorbers...; tol=1e-5)
+
+Compute the optical depth (τ) between two pressure levels
+
+# Arguments
+
+* `P₁`: first pressure level [Pa]
+* `P₂`: second pressure level [Pa]
+* `g`: gravitational acceleration [m/s``^2``]
+* `fT`: temperature [K] as a function of pressure [Pa], `fT(P)`
+* `fμ`: mean molar mass as a function of temperature [K] and pressure [Pa], `fμ(T,P)`
+* `θ`: angle [rad] of path, must be ∈ [0,π/2)
+* `absorbers`: any number of gas objects, [`CIATables`](@ref), and functions in the form σ(ν, T, P)
+
+Returns a vector of optical depths across all wavenumbers stored in gas objects. The `tol` keyword argument adjusts integrator error tolerance.
+"""
 function opticaldepth(P₁::Real,
                       P₂::Real,
                       g::Real,
@@ -222,14 +279,32 @@ function opticaldepth(P₁::Real,
 end
 
 #-------------------------------------------------------------------------------
+#the basic transmittance method exp(-τ) is already exported
 
-function transmittance(P₁, P₂, g, fT, fμ, θ, absorbers...; tol=1e-5)
-    transmittance.(opticaldepth(P₁, P₂, g, fT, fμ, θ, absorbers...; tol=tol))
-end
+"""
+    transmittance(P₁, P₂, g, fT, fμ, θ, absorbers...; tol=1e-5)
+
+Compute the transmittance between two pressure levels
+
+# Arguments
+
+* `P₁`: first pressure level [Pa]
+* `P₂`: second pressure level [Pa]
+* `g`: gravitational acceleration [m/s``^2``]
+* `fT`: temperature [K] as a function of pressure [Pa], `fT(P)`
+* `fμ`: mean molar mass as a function of temperature [K] and pressure [Pa], `fμ(T,P)`
+* `θ`: angle [rad] of path, must be ∈ `[0,π/2)`
+* `absorbers`: any number of gas objects, [`CIATables`](@ref), and functions in the form σ(ν, T, P)
+
+Returns a vector of transmittances across all wavenumbers stored in gas objects. The `tol` keyword argument adjusts integrator error tolerance.
+"""
+transmittance(X...; kwargs...) = transmittance.(opticaldepth(X...; kwargs...))
 
 #-------------------------------------------------------------------------------
 export outgoing
 
+"""
+"""
 function outgoing(Pₛ::Real,
                   Pₜ::Real,
                   g::Real,

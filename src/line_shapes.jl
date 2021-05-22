@@ -106,13 +106,13 @@ function scaleintensity(S, νl, Epp, M::Int16, I::Int16, T)::Float64
     b = -c2*νl
     #numerator and denominator
     n = exp(a/T)*(1 - exp(b/T))
-    d = exp(a/Tref)*(1 - exp(b/Tref))
+    d = exp(a/𝐓ᵣ)*(1 - exp(b/𝐓ᵣ))
     #check if there is an approximating function
     if MOLPARAM[M][10][I]
         QrefQ = chebyQrefQ(T, MOLPARAM[M][11][I], MOLPARAM[M][13][I])
     else
         throw("no interpolating polynomial available to compute Qref/Q for isotopologue $I of $(MOLPARAM[M][3]) ($(MOLPARAM[M][2]))")
-        #QrefQ = (Tref/T)^1.5
+        #QrefQ = (𝐓ᵣ/T)^1.5
     end
     #shifted line intensity
     S*QrefQ*(n/d)
@@ -248,7 +248,7 @@ Compute lorentzian broadening coefficient
 * `Pₚ`: partial pressure [Pa]
 """
 function γlorentz(γa, γs, na, T, P, Pₚ)::Float64
-    ((Tref/T)^na)*(γa*(P - Pₚ) + γs*Pₚ)/𝐀
+    ((𝐓ᵣ/T)^na)*(γa*(P - Pₚ) + γs*Pₚ)/𝐀
 end
 
 function γlorentz(sl::SpectralLines, i::Vector{Int64}, T, P, Pₚ)::Vector{Float64}

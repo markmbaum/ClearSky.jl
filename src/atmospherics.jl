@@ -42,15 +42,15 @@ end
 """
     hydrostatic(z, Pₛ, g, fT, fμ)
 
-Compute the hydrostatic pressure [Pa] at a specific altitude using arbitrary atmospheric profiles of temperature of mean molar mass
+Compute the hydrostatic pressure [Pa] at a specific altitude using arbitrary atmospheric profiles of temperature and mean molar mass
 
 # Arguments
 
 * `z`: altitude [m] to compute pressure at
 * `Pₛ`: surface pressure [Pa]
 * `g`: gravitational acceleration [m/s``^2``]
-* `fT`: temperature as a function of pressure, `fT(P)`
-* `fμ`: mean molar mass as a function of pressure and temperature `fμ(T,P)`
+* `fT`: temperature [K] as a function of pressure, `fT(P)`
+* `fμ`: mean molar mass [kg/mole] as a function of pressure and temperature `fμ(T,P)`
 """
 function hydrostatic(z, Pₛ, g, fT::T, fμ::U)::Float64 where {T,U}
     @assert z >= 0 "cannot compute pressure at negative altitude $z m"
@@ -66,15 +66,15 @@ end
 """
     altitude(P, Pₛ, g, fT, fμ)
 
-Compute the altitude [m] at which a specific hydrostatic pressure occurs using arbitrary atmospheric profiles of temperature of mean molar mass
+Compute the altitude [m] at which a specific hydrostatic pressure occurs using arbitrary atmospheric profiles of temperature and mean molar mass
 
 # Arguments
 
 * `P`: pressure [Pa] to compute altitude at
 * `Pₛ`: surface pressure [Pa]
 * `g`: gravitational acceleration [m/s``^2``]
-* `fT`: temperature as a function of pressure, `fT(P)`
-* `fμ`: mean molar mass as a function of pressure and temperature `fμ(T,P)`
+* `fT`: temperature [K] as a function of pressure, `fT(P)`
+* `fμ`: mean molar mass [kg/mole] as a function of pressure and temperature `fμ(T,P)`
 """
 function altitude(P, Pₛ, g, fT::T, fμ::U)::Float64 where {T,U}
     #pressure decreases monotonically, find altitudes bracketing Pₜ
@@ -102,8 +102,8 @@ end
 * `Pₛ`: surface pressure [Pa]
 * `Pₜ`: top of profile pressure [Pa]
 * `g`: gravitational acceleration [m/s``^2``]
-* `fT`: temperature as a function of presssure, `fT(P)`
-* `fμ`: mean molar mass as a function of temperature and pressure, `fμ(T,P)`
+* `fT`: temperature [K] as a function of presssure, `fT(P)`
+* `fμ`: mean molar mass [kg/mole] as a function of temperature and pressure, `fμ(T,P)`
 
 For a constant molar mass or temperature, you can use [anonymous functions](https://docs.julialang.org/en/v1/manual/functions/#man-anonymous-functions) directly. For example, to construct a hydrostatic pressure profile for a crude Earth-like atmosphere:
 
@@ -334,7 +334,7 @@ end
 """
     tropopause(Γ::AbstractAdiabat)
 
-Compute the temperature and pressure at which the tropopause occurs in an adiabatic temperature profile. This function can be called on a `DryAdiabat` or `MoistAdiabat` if it was constructed with nonzero `Tstrat` or `Ptropo`. Returns a tuple, `(T,P)`.
+Compute the temperature [K] and pressure [Pa] at which the tropopause occurs in an adiabatic temperature profile. This function can be called on a `DryAdiabat` or a `MoistAdiabat` if it was constructed with nonzero `Tstrat` or `Ptropo`. Returns a tuple, `(T,P)`.
 """
 function tropopause(Γ::AbstractAdiabat)::Tuple{Float64,Float64}
     if Γ.Ptropo != 0

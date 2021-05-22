@@ -28,28 +28,39 @@ Now you can create a gas object directly from a `par` file containing the spectr
 ```julia
 co2 = WellMixedGas("CO2.par", 400e-6, ν, Ω)
 ```
-In the background, `ClearSky`
+In the background, `ClearSky` does the following
 1. reads line data
 2. computes absorption cross-sections for each wavenumber, temperature, and pressure point defined by `ν` and `Ω` (using the [`voigt!`](@ref) profile by default)
 3. generates high-accuracy interpolation functions for the temperature-pressure grid at each wavenumber
 4. stores concentration information
 
-Consequently, loading gases will take some time. It will be faster more threads (of course) and with fewer wavenumber, temperature, and pressure points.
+Consequently, loading gases will take some time. It will be faster with more threads and with fewer wavenumber, temperature, and pressure points.
 
 ## Retrieving Cross-Sections
 
-Gases are [function-like objects](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects). They can be used like functions to retrieve **concentration-scaled** cross-sections at any temperature and pressure withing the atmospheric domain. For example, computing cross-sections at a specific temperature and pressure, 250 K and 10000 Pa for example, is as simple as
+Gases are [function-like objects](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects). They can be used like functions to retrieve **concentration-scaled** cross-sections at any temperature and pressure within the atmospheric domain. For example, computing cross-sections at a specific temperature and pressure, 250 K and 10000 Pa for example, is as simple as
 
 ```julia
 co2(250, 1e4)
 ```
 
-This will return a vector of cross-sections values at each wavenumber point the gas was created with (units of cm``^2``/molecule). In this case, you'll get cross-sections for 2500 evenly spaced wavenumbers between 1 and 2500 cm``^{-1}``.
+This returns a vector of cross-section values [cm``^2``/molecule] at each wavenumber point the gas was created with. The cross sections are scaled by the gas molar concentration that was used when constructing the gas.
 
 If you only need a cross-section for one of the specific wavenumber points in the gas, you must pass the index of that wavenumber before the temperature and pressure. For example, to get the cross-section corresponding to `ν[600]`,
 
 ```julia
 co2(600, 250, 1e4)
+```
+
+## Storing Gases
+
+Creating gas objects may take some time if you have few threads, a huge number of wavenumbers, and/or a dense temperature-pressure grid in your [`AtmosphericDomain`](@ref). To avoid loading the same gas twice, you can use Julia's built-in [serialization functions](https://docs.julialang.org/en/v1/stdlib/Serialization/) to save gases to files and quickly reload them. For example, assuming you have a gas object named `co2`, the following code will write the gas to file, then reload it.
+```julia
+using Serialization
+#write the gas to a file called "co2"
+serialize("co2", co2);
+#reload the same gas from that file
+co2 = deserialize("co2");
 ```
 
 -----

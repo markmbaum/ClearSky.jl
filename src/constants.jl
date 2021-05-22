@@ -16,6 +16,6 @@ const 𝐍𝐚 = 6.02214076e23
 const 𝐃𝐚 = 1.66053907e-27
 
 #reference temperature of HITRAN database [K]
-const Tref = 296.0
+const 𝐓ᵣ = 296.0
 #reference temperature [K] equivalent to 0 degrees Celsius
-const T0 = 273.15
+const 𝐓₀ = 273.15
