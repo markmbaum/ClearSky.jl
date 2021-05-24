@@ -4,7 +4,9 @@
 
 ## Temperature Profiles
 
-Routines for dry and moist adiabatic profiles are available through the [`DryAdiabat`](@ref) and [`MoistAdiabat`](@ref) types, which are [function-like types](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects). There is also a [`tropopause`](@ref) function for convenience.
+Many radiative transfer calculations require an atmospheric temperature profile. `ClearSky` is designed to work with any arbitrary temperature profile if it can be defined as a function of pressure, `T(P)`.
+
+For convenience, dry and moist adiabatic profiles are available through the [`DryAdiabat`](@ref) and [`MoistAdiabat`](@ref) types, which are [function-like types](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects). There is also a [`tropopause`](@ref) function.
 
 ```@docs
 DryAdiabat

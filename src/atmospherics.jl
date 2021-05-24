@@ -141,7 +141,7 @@ end
 """
     altitude(H::Hydrostatic, P)
 
-Compute the altitude at which a specific pressure occurs in a hydrostatic pressure profile.
+Compute the altitude at which a specific pressure occurs in a [`Hydrostatic`](@ref) pressure profile.
 """
 altitude(H::Hydrostatic, P)::Float64 = falseposition(z -> log(H(z)) - log(P), 0.0, H.zₜ)
 
@@ -163,6 +163,17 @@ abstract type AbstractAdiabat end
 
 export MoistAdiabat, DryAdiabat
 export tropopause
+
+function checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
+    @assert Pₛ > Pₜ "Pₛ must be greater than Pₜ"
+    @assert Pₜ > 0 "Pₜ must be greater than 0"
+    if Tstrat > 0
+        @assert Tstrat < Tₛ "Tstrat cannot be greater than Tₛ"
+    end
+    if (Tstrat != 0) & (Ptropo != 0)
+        throw("Cannot have nonzero Tstrat and Ptropo, must use one or the other")
+    end
+end
 
 #------------------------------------
 
@@ -210,8 +221,7 @@ struct DryAdiabat <: AbstractAdiabat
 end
 
 function DryAdiabat(Tₛ, Pₛ, cₚ, μ, Pₜ=PMIN; Tstrat=0, Ptropo=0)
-    @assert Pₛ > Pₜ "Pₛ must be greater than Pₜ"
-    @assert Pₜ > 0 "Pₜ must be greater than 0"
+    checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
     DryAdiabat(Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo)
 end
 
@@ -274,11 +284,7 @@ function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F,
                       Tstrat=0.0,
                       Ptropo=0.0,
                       N::Int=1000) where {F<:Function}
-    if (Tstrat != 0) & (Ptropo != 0)
-        throw("Cannot have nonzero Tstrat and Ptropo, must use one or the other")
-    end
-    @assert Pₛ > Pₜ "Pₛ must be greater than Pₜ"
-    @assert Pₜ > 0 "Pₜ must be greater than 0"
+    checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
     #interpolation knots and output vector
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
     ω = logrange(ω₁, ω₂, N)
@@ -355,7 +361,7 @@ export psatH2O, tsatCO2, ozonelayer
 
 Compute the saturation partial pressure of water vapor at a certain temperature using expressions from
 
-* Murphy, D. M. & Koop, T. Review of the vapour pressures of ice and supercooled water for atmospheric applications. Q. J. R. Meteorol. Soc. 131, 1539–1565 (2005).
+* [Murphy, D. M. & Koop, T. Review of the vapour pressures of ice and supercooled water for atmospheric applications. Q. J. R. Meteorol. Soc. 131, 1539–1565 (2005).](https://rmets.onlinelibrary.wiley.com/doi/10.1256/qj.04.94)
 """
 function psatH2O(T)::Float64
     a = log(T)
@@ -375,7 +381,7 @@ end
 """
     tsatCO2(P)
 
-Compute the saturation pressure of carbon dioxide at a certain pressure using expression from Fanale et al. (1982)
+Compute the saturation pressure of carbon dioxide at a certain pressure using an expression from Fanale et al. (1982)
 """
 function tsatCO2(P)::Float64
     @assert P <= 518000.0 "Pressure cannot be above 518000 Pa for CO2 saturation temperature"
@@ -383,20 +389,19 @@ function tsatCO2(P)::Float64
 end
 
 """
-    ozonelayer(P)
+    ozonelayer(P, Cmax=8e-6)
 
-Approximate the molar concentration of ozone in Earth's ozone layer using an 8 ppm peak at 1600 Pa
+Approximate the molar concentration of ozone in Earth's ozone layer using an 8 ppm peak at 1600 Pa which falls to zero at 100 Pa and 25500 Pa. Peak concentration is defined by `Cmax`.
 """
-function ozonelayer(P)::Float64 #yields molar concentration with peak at 8 ppm
+function ozonelayer(P, Cmax::Float64=8e-6)::Float64
     P = log(P)
     P₁ = 10.146433731146518 #ln(25500)
     P₂ = 7.3777589082278725 #ln(1600)
     P₃ = 4.605170185988092  #ln(100)
-    C₂ = 8e-6
     if P₂ <= P <= P₁
-        return C₂*(P₁ - P)/(P₁ - P₂)
+        return Cmax*(P₁ - P)/(P₁ - P₂)
     elseif P₃ <= P <= P₂
-        return C₂*(P - P₃)/(P₂ - P₃)
+        return Cmax*(P - P₃)/(P₂ - P₃)
     end
     return 0
 end

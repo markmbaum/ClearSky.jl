@@ -72,7 +72,7 @@ end
 export OpacityTable
 
 """
-An `OpacityTable` is a simple object wrapping a [BichebyshevInterpolator](https://wordsworthgroup.github.io/BasicInterpolators.jl/stable/2d/#BasicInterpolators.BichebyshevInterpolator). Inside, the interpolator stores a grid of `log` cross-section values along `log` pressure coordinates and temperature coordinates. An `OpacityTable` behaves like a function, recieving a temperature and pressure. When called, it retrieves a cross-section from the interpolator, undoes the `log`, and returns it. When constructing a gas object, each wavenumber is allocated a unique `OpacityTable` for fast and accurate cross-section evaluation at any temperature and pressure inside the `AtmosphericDomain`. Generally, `OpacityTable` objects should be used indirectly through gas objects.
+An `OpacityTable` is a simple object wrapping a [BichebyshevInterpolator](https://wordsworthgroup.github.io/BasicInterpolators.jl/stable/chebyshev/). Inside, the interpolator stores a grid of `log` cross-section values along `log` pressure coordinates and temperature coordinates. An `OpacityTable` behaves like a function, recieving a temperature and pressure. When called, it retrieves a cross-section from the interpolator, undoes the `log`, and returns it. When constructing a gas object, each wavenumber is allocated a unique `OpacityTable` for fast and accurate cross-section evaluation at any temperature and pressure inside the `AtmosphericDomain`. Generally, `OpacityTable` objects should be used indirectly through gas objects.
 """
 struct OpacityTable
     itp::BichebyshevInterpolator
@@ -110,7 +110,8 @@ end
 function bake(sl::SpectralLines,
               Cfun::F,
               shape!::G,
-              ν::AbstractVector{<:Real},
+              Δνcut::Float64,
+              ν::Vector{Float64},
               Ω::AtmosphericDomain
               )::Vector{OpacityTable} where {F, G<:Function}
     #check wavenumbers for problems
@@ -132,7 +133,7 @@ function bake(sl::SpectralLines,
             #make sure concentration isn't wacky
             @assert 0 <= C <= 1 "gas molar concentrations must be in [0,1], not $C (encountered @ $T K, $P Pa)"
             #evaluate line shapes (slow part)
-            shape!(σᵢⱼ, ν, sl, T, P, C*P)
+            shape!(σᵢⱼ, ν, sl, T, P, C*P, Δνcut)
         end
     end
     #check for weirdness
@@ -211,9 +212,10 @@ Gas type for well mixed atmospheric constituents. Must be constructed from a `.p
 * `ν`: vector of wavenumber samples [cm``^{-1}``]
 * `Ω`: [`AtmosphericDomain`](@ref)
 * `shape!`: line shape to use, must be the in-place version ([`voigt!`](@ref), [`lorentz!`](@ref), etc.)
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
 
 
-    WellMixedGas(par::String, C, ν, Ω, shape!=voigt!; kwargs...)
+    WellMixedGas(par::String, C, ν, Ω, shape!=voigt!, Δνcut=25; kwargs...)
 
 Same arguments as the first constructor, but reads a `par` file directly into the gas object. Keyword arguments are passed through to [`readpar`](@ref).
 """
@@ -231,16 +233,18 @@ function WellMixedGas(sl::SpectralLines,
                       C::Real,
                       ν::AbstractVector{<:Real},
                       Ω::AtmosphericDomain,
-                      shape!::Function=voigt!)
+                      shape!::Function=voigt!,
+                      Δνcut::Real=25)
     μ = meanmolarmass(sl)
     ν = collect(Float64, ν)
-    Π = bake(sl, (T,P)->C, shape!, ν, Ω)
+    Δνcut = convert(Float64, Δνcut)
+    Π = bake(sl, (T,P)->C, shape!, Δνcut, ν, Ω)
     WellMixedGas(sl.name, sl.formula, μ, C, ν, Ω, Π)
 end
 
-function WellMixedGas(par, C, ν, Ω, shape!::Function=voigt!; kwargs...)
+function WellMixedGas(par, C, ν, Ω, shape!::Function=voigt!, Δνcut=25; kwargs...)
     sl = SpectralLines(par; kwargs...)
-    WellMixedGas(sl, C, ν, Ω, shape!)
+    WellMixedGas(sl, C, ν, Ω, shape!, Δνcut)
 end
 
 #-------------------------------
@@ -257,15 +261,17 @@ Gas type for variable concentration atmospheric constituents. Must be constructe
 * `ν`: vector of wavenumber samples [cm``^{-1}``]
 * `Ω`: [`AtmosphericDomain`](@ref)
 * `shape!`: line shape to use, must be the in-place version ([`voigt!`](@ref), [`lorentz!`](@ref), etc.)
+* `Δνcut`: profile truncation distance [cm``^{-1}``]
 
 
-    VariableGas(par::String, C, ν, Ω, shape!=voigt!; kwargs...)
+    VariableGas(par::String, C, ν, Ω, shape!=voigt!, Δνcut=25; kwargs...)
 
 Same arguments as the first constructor, but reads a `par` file directly into the gas object. Keyword arguments are passed through to [`readpar`](@ref).
 """
 struct VariableGas{F} <: AbstractGas
     name::String
     formula::String
+    μ::Float64 #mean molar mass
     C::F #concentration [mole/mole] from temperature and pressure, C(T,P)
     ν::Vector{Float64}
     Ω::AtmosphericDomain
@@ -276,16 +282,17 @@ function VariableGas(sl::SpectralLines,
                      C::Q,
                      ν::AbstractVector{<:Real},
                      Ω::AtmosphericDomain,
-                     shape!::Function=voigt!) where {Q}
+                     shape!::Function=voigt!,
+                     Δνcut::Real=25) where {Q}
     μ = meanmolarmass(sl)
     ν = collect(Float64, ν)
-    Π = bake(sl, C, shape!, ν, Ω)
+    Π = bake(sl, C, shape!, Δνcut, ν, Ω)
     VariableGas(sl.name, sl.formula, μ, C, ν, Ω, Π)
 end
 
-function VariableGas(par, C, ν, Ω, shape!::Function=voigt!; kwargs...)
+function VariableGas(par, C, ν, Ω, shape!::Function=voigt!, Δνcut=25; kwargs...)
     sl = SpectralLines(par; kwargs...)
-    VariableGas(sl, C, ν, Ω, shape!)
+    VariableGas(sl, C, ν, Ω, shape!, Δνcut)
 end
 
 #-------------------------------

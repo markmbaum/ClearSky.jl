@@ -197,11 +197,11 @@ function incomingstream(ι₁, #transformed pressure at start of integration
                         m, #1/cos(θ), where θ is the stream angle
                         fT::Q, #temperature profile fT(P)
                         fμ::R, #mean molar mass as a function of T,P
-                        fI₀::S, #initial irradiance as a function of wavenumber fI₀(ν)
+                        fIₜ::S, #initial irradiance as a function of wavenumber fIₜ(ν)
                         tol #integrator tolerance
                         )::Float64 where {Q,R,S}
     #initial intensity
-    I₀ = fI₀(ν)
+    I₀ = fIₜ(ν)
     #pack parameters
     param = (A, i, ν, g, m, fT, fμ)
     #integrate
@@ -219,11 +219,11 @@ function incomingstream!(I, #vector output irradiance
                          m, #1/cos(θ), where θ is the stream angle
                          fT::Q, #temperature profile fT(P)
                          fμ::R, #mean molar mass as a function of T,P
-                         fI₀::S, #initial irradiance as a function of wavenumber fI₀(ν)
+                         fIₜ::S, #initial irradiance as a function of wavenumber fIₜ(ν)
                          tol #integrator tolerance
                          )::Float64 where {Q,R,S}
     #initial intensity
-    I₀ = fI₀(ν)
+    I₀ = fIₜ(ν)
     #pack parameters
     param = (A, i, ν, g, m, fT, fμ)
     #integrate
@@ -319,14 +319,19 @@ function outgoing(Pₛ::Real,
     m, w, θ = streamnodes(nstream)
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
     #integrate wavenumbers in parallel
-    I = zeros(Float64, nν)
+    F = zeros(Float64, nν)
     @threads for i = 1:nν
         for j = 1:nstream
+            #outgoing irradiance at Pₜ
             Iⱼ = outgoingstream(ω₁, ω₂, A, i, ν[i], g, m[j], fT, fμ, tol)
-            I[i] += π*w[j]*Iⱼ #contribute to gauss quad
+            #contribute to gauss quad
+            #F[i] += w[j]*(2*π*sin(θ[j])*cos(θ[j])*Iⱼ) #why not this???
+            F[i] += w[j]*π*Iⱼ
         end
     end
-    return I
+    #for hemisphere flux, ∫∫ I cos(θ) sin(θ) dθ dϕ = πI, assuming isotropy
+    #F = π.*I
+    return F
 end
 
 #-------------------------------------------------------------------------------
@@ -337,7 +342,7 @@ function incoming(Pₜ::Real,
                   g::Real,
                   fT::Q,
                   fμ::R,
-                  fI₀::S,
+                  fIₜ::S,
                   θ::Real,
                   absorbers...;
                   tol::Float64=1e-5
@@ -350,7 +355,38 @@ function incoming(Pₜ::Real,
     #integrate wavenumbers in parallel
     I = zeros(Float64, nν)
     @threads for i = 1:nν
-        I[i] = incomingstream(ι₁, ι₂, A, i, ν[i], g, m, fT, fμ, fI₀, tol)
+        #incoming stream at only one angle
+        I[i] = incomingstream(ι₁, ι₂, A, i, ν[i], g, m, fT, fμ, fIₜ, tol)
     end
-    return I
+    #single stream, flux is simply scaled by the angle
+    F = cos(θ).*I
+    return F
+end
+
+#-------------------------------------------------------------------------------
+export heating
+
+function heating(Pₛ,
+                 Pₜ,
+                 g,
+                 fT::Q,
+                 fμ::R,
+                 fIₜ::S,
+                 θ::Real,
+                 outgoingabsorbers::Tuple,
+                 incomingabsorbers::Tuple;
+                 tol::Float64=1e-5) where {Q,R,S}
+    #initialize outgoing stuff
+    Aₒ, νₒ, nvₒ = setupintegration(Pₛ, Pₜ, outgoingabsorbers)
+    mₒ, w, _ = streamnodes(nstream)
+    ω₁, ω₂ = P2ω(Pₛ, Pₜ)
+    #initialize incoming stuff
+    Aᵢ, νᵢ, nνᵢ = setupintegration(Pₛ, Pₜ, incomingabsorbers)
+    ι₁, ι₂ = P2ι(Pₜ, Pₛ)
+    checkazimuth(θ)
+    mᵢ = 1/cos(θ)
+    #
+    #Iᵢ
+    #Iₒ
+    #@threads for i = 1:nν
 end

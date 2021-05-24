@@ -8,7 +8,7 @@ To work with spectral line data directly, use the [`readpar`](@ref) function to 
 
 If you plan to compute line shapes directly, read par files into [`SpectralLines`](@ref) objects. The constructor reads files using [`readpar`](@ref) then rearranges it for line shape calculations. Unnecessary information is dropped and the molecule name, formula, and molar masses are assigned. To compute line shapes, see [Computing Line Shapes](computing_line_shapes.md).
 
-For only high-level calculations, `par` files can be loaded directly into gas objects, as described [[]]
+For only high-level calculations, `par` files can also be loaded directly into [gas objects](gas_objects.md).
 
 ```@docs
 readpar

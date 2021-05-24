@@ -4,7 +4,7 @@ Gas objects are high-level representations of greenhouse gases that allow fast a
 
 ## Creating Gases
 
-Before creating a gas object, you must be sure to start your Julia session with all available threads on your system. For example, if your computer has 8 threads available, use
+Before creating a gas object, you should start your Julia session with all available threads on your system. For example, if your computer has 8 threads available, use
 ```shell
 julia --threads 8
 ```
@@ -12,14 +12,14 @@ julia --threads 8
 then you can define the
 
 1. vector of wavenumbers
-2. temperature and pressure ranges ([`AtmospericDomain`](@ref))
+2. temperature and pressure ranges ([`AtmosphericDomain`](@ref))
 
 over which its absorption cross-sections will be defined. For example,
 
 ```julia
 using ClearSky
 ν = LinRange(1, 2500, 2500);
-Ω = AtmospericDomain((100,350), 12, (1,1e5), 24);
+Ω = AtmosphericDomain((100,350), 12, (1,1e5), 24);
 ```
 
 defines 2500 evenly spaced wavenumber samples over the longwave window and an atmospheric domain between 100-350 K and 1-1e5 Pa. The numbers 12 and 24 define the number of interpolation nodes along the temperature and pressure axes, respectively.
