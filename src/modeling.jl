@@ -243,10 +243,10 @@ Compute the optical depth (τ) between two pressure levels
 * `P₁`: first pressure level [Pa]
 * `P₂`: second pressure level [Pa]
 * `g`: gravitational acceleration [m/s``^2``]
-* `fT`: temperature [K] as a function of pressure [Pa], `fT(P)`
+* `fT`: temperature [K] as a function of pressure [Pa], `fT(P)`. This may be any callable object, like [`MoistAdiabat`](@ref), for example.
 * `fμ`: mean molar mass as a function of temperature [K] and pressure [Pa], `fμ(T,P)`
-* `θ`: angle [rad] of path, must be ∈ [0,π/2)
-* `absorbers`: any number of gas objects, [`CIATables`](@ref), and functions in the form σ(ν, T, P)
+* `θ`: angle [rad] of path, must be ∈ [0,π/2), where 0 is straight up
+* `absorbers`: at least one gas object and any number of [`CIATables`](@ref) and functions in the form σ(ν, T, P)
 
 Returns a vector of optical depths across all wavenumbers stored in gas objects. The `tol` keyword argument adjusts integrator error tolerance.
 """
@@ -291,10 +291,10 @@ Compute the transmittance between two pressure levels
 * `P₁`: first pressure level [Pa]
 * `P₂`: second pressure level [Pa]
 * `g`: gravitational acceleration [m/s``^2``]
-* `fT`: temperature [K] as a function of pressure [Pa], `fT(P)`
+* `fT`: temperature [K] as a function of pressure [Pa], `fT(P)`. This may be any callable object, like [`MoistAdiabat`](@ref), for example.
 * `fμ`: mean molar mass as a function of temperature [K] and pressure [Pa], `fμ(T,P)`
-* `θ`: angle [rad] of path, must be ∈ `[0,π/2)`
-* `absorbers`: any number of gas objects, [`CIATables`](@ref), and functions in the form σ(ν, T, P)
+* `θ`: angle [rad] of path, must be ∈ `[0,π/2)`, where 0 is straight up
+* `absorbers`: at least one gas object and any number of [`CIATables`](@ref) and functions in the form σ(ν, T, P)
 
 Returns a vector of transmittances across all wavenumbers stored in gas objects. The `tol` keyword argument adjusts integrator error tolerance.
 """
@@ -304,6 +304,19 @@ transmittance(X...; kwargs...) = transmittance.(opticaldepth(X...; kwargs...))
 export outgoing
 
 """
+    outgoing(Pₛ, Pₜ, g, fT, fμ, absorbers; nstream=3, tol=1e-5)
+
+Compute outgoing radiative flux [W/m``^2``/cm``^{-1}``] at each wavenumber defined in the provided gas object(s). Total flux [W/m``^2``] can be evaluated with the [`trapz`](@ref) function.
+
+# Arguments
+* `Pₛ`: surface pressure [Pa]
+* `Pₜ`: top of atmopshere pressure [Pa]
+* `g`: gravitational acceleration [m/s``^2``]
+* `fT`: temperature [K] as a function of pressure [Pa], `fT(P)`. This may be any callable object, like [`MoistAdiabat`](@ref), for example.
+* `fμ`: mean molar mass as a function of temperature [K] and pressure [Pa], `fμ(T,P)`
+* `absorbers`: at least one [gas object](gas_objects.md) and any number of [`CIATables`](@ref) and functions in the form σ(ν, T, P)
+
+The keyword argument `nstream` specifies how many independent streams, or beam angles through the atmosphere, to integrate. The keyword argument `tol` is a numerical error tolerance passed to the [`radau`](https://github.com/wordsworthgroup/ScalarRadau.jl) integrator.
 """
 function outgoing(Pₛ::Real,
                   Pₜ::Real,
@@ -337,6 +350,21 @@ end
 #-------------------------------------------------------------------------------
 export incoming
 
+"""
+    incoming(Pₜ, Pₛ, g, fT, fμ, absorbers; nstream=3, tol=1e-5)
+
+Compute incoming radiative flux [W/m``^2``/cm``^{-1}``] at each wavenumber defined in the provided gas object(s). Total flux [W/m``^2``] can be evaluated with the [`trapz`](@ref) function.
+
+# Arguments
+* `Pₜ`: top of atmopshere pressure [Pa]
+* `Pₛ`: surface pressure [Pa]
+* `g`: gravitational acceleration [m/s``^2``]
+* `fT`: temperature [K] as a function of pressure [Pa], `fT(P)`. This may be any callable object, like [`MoistAdiabat`](@ref), for example.
+* `fμ`: mean molar mass as a function of temperature [K] and pressure [Pa], `fμ(T,P)`
+* `absorbers`: at least one [gas object](gas_objects.md) and any number of [`CIATables`](@ref) and functions in the form σ(ν, T, P)
+
+The keyword argument `nstream` specifies how many independent streams, or beam angles through the atmosphere, to integrate. The keyword argument `tol` is a numerical error tolerance passed to the [`radau`](https://github.com/wordsworthgroup/ScalarRadau.jl) integrator.
+"""
 function incoming(Pₜ::Real,
                   Pₛ::Real,
                   g::Real,

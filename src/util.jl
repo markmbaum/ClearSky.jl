@@ -1,8 +1,9 @@
 export trapz
+
 """
     trapz(x, y)
 
-Integrate a sorted group of coordiantes using the composite [trapezoidal rule](https://en.wikipedia.org/wiki/Trapezoidal_rule)
+Integrate a sorted group of coordinates using the composite [trapezoidal rule](https://en.wikipedia.org/wiki/Trapezoidal_rule).
 """
 function trapz(x::AbstractVector, y::AbstractVector)::Float64
     @assert length(x) == length(y) "vectors must be equal length"
