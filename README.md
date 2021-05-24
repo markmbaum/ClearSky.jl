@@ -8,3 +8,12 @@
 
 
 under development
+
+to use the code, download or clone the repository, take `.jl` out of the folder name, then
+```julia
+push!(LOAD_PATH, "path/to/repo")
+```
+replacing `path/to/repo` with the path to the folder above the `ClearSky` folder. Then you should be able to load the code with
+```julia
+using ClearSky
+```
