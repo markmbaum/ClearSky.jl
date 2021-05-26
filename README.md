@@ -9,11 +9,19 @@
 
 under development
 
-to use the code, download or clone the repository, take `.jl` out of the folder name, then
+to use the code, download or clone the repository, take `.jl` out of the folder name, then start Julia with all your threads. For example, if your compute has 8 threads,
+```shell
+julia --threads 8
+```
+Tell Julia where you put the code
 ```julia
 push!(LOAD_PATH, "path/to/repo")
 ```
-replacing `path/to/repo` with the path to the folder above the `ClearSky` folder. Then you should be able to load the code with
+replacing `path/to/repo` with the path to the folder above the `ClearSky` folder. Then load the code with
 ```julia
 using ClearSky
+```
+and you should see something like
+```
+[ Info: Precompiling ClearSky [5964c129-204c-4c32-bd6e-c8dff7ca179b]
 ```
