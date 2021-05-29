@@ -19,7 +19,8 @@ makedocs(;
         "Line Shapes" => "line_shapes.md",
         "Gas Objects" => "gas_objects.md",
         "Atmospheric Profiles" => "atmospheric_profiles.md",
-        "Modeling" => "modeling.md"
+        "Modeling" => "modeling.md",
+        "Orbits & Insolation" => "orbits_insolation.md"
     ],
 )
 

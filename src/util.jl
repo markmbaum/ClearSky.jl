@@ -14,6 +14,12 @@ function trapz(x::AbstractVector, y::AbstractVector)::Float64
     return s
 end
 
+function meshgrid(x::AbstractVector, y::AbstractVector)
+    X = x' .* ones(length(y))
+    Y = y .* ones(length(x))'
+    return X, Y
+end
+
 function logrange(a, b, N::Int=101, γ=1)::Vector{Float64}
     ((10 .^ LinRange(0, γ, N)) .- 1)*(b - a)/(10^γ - 1) .+ a
 end

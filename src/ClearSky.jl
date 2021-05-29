@@ -3,6 +3,7 @@ module ClearSky
 using Base: tail
 using Base.Threads: @threads
 using QuadGK: gauss
+using Cubature
 using BasicInterpolators
 using ScalarRadau
 
@@ -18,6 +19,8 @@ include("collision_induced_absorption.jl")
 include("atmospherics.jl")
 include("radiation.jl")
 include("modeling.jl")
+include("orbital.jl")
+include("insolation.jl")
 
 using .Faddeyeva
 

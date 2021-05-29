@@ -14,6 +14,8 @@ const 𝐀 = 101325.0
 const 𝐍𝐚 = 6.02214076e23
 #Dalton [kg] (mass of particle basically, also ≡ 1/𝐍𝐚/1000)
 const 𝐃𝐚 = 1.66053907e-27
+#gravitational constant [m^3/kg/s^2]
+const 𝐆 = 6.6743e-11
 
 #reference temperature of HITRAN database [K]
 const 𝐓ᵣ = 296.0
