@@ -12,6 +12,7 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
 BasicInterpolators = "0.2"
+Cubature = "1.5"
 QuadGK = "2.4"
 ScalarRadau = "0.2"
 SpecialFunctions = "1.4"
