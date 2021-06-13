@@ -11,7 +11,7 @@ ScalarRadau = "52145ff8-3717-48bc-b8ab-44d3704098ee"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
-BasicInterpolators = "0.2"
+BasicInterpolators = "0.2, 0.3"
 Cubature = "1.5"
 QuadGK = "2.4"
 ScalarRadau = "0.2, 1"
