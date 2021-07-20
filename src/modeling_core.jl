@@ -20,14 +20,6 @@ function checkpressures(gases, pressures...)::Nothing
     nothing
 end
 
-function checkpressures(ga::GroupedAbsorber, pressures...)
-    checkpressures(ga.gas, pressures...)
-end
-
-function checkpressures(aa::AcceleratedAbsorber, pressures...)
-    checkpressures(aa.ga.gas, pressures...)
-end
-
 function checkazimuth(θ)::Nothing
     @assert 0 <= θ < π/2 "azimuth angle θ must be ∈ [0,π/2)"
     nothing
@@ -142,6 +134,10 @@ function noabsorption(ga::GroupedAbsorber)::Vector{Bool}
     [noabsorption(ga, i) for i ∈ eachindex(ga.ν)]
 end
 
+function checkpressures(ga::GroupedAbsorber, pressures...)
+    checkpressures(ga.gas, pressures...)
+end
+
 #-------------------------------------------------------------------------------
 # accelerated interpolation of cross-sections
 
@@ -196,6 +192,10 @@ noabsorption(aa::AcceleratedAbsorber, i::Int)::Bool = aa.empty[i]
 
 function noabsorption(ga::GroupedAbsorber)::Vector{Bool}
     [noabsorption(aa, i) for i ∈ eachindex(ga.ν)]
+end
+
+function checkpressures(aa::AcceleratedAbsorber, pressures...)
+    checkpressures(aa.ga.gas, pressures...)
 end
 
 function update!(aa::AcceleratedAbsorber, T::Vector{Float64})
