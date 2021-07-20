@@ -67,7 +67,7 @@ function eccentricanomaly(t, a, m, e)
     #definition of mean anomaly
     M = 2π*rem(t, T)/T
     #eccentric anomaly must be found numerically
-    E = falseposition(E->meananomaly(E, e) - M, 0, 2π)
+    E = falseposition((E,p)->meananomaly(E, e) - M, 0, 2π)
     return E
 end
 
@@ -88,14 +88,14 @@ orbitaldistance(a, f, e) = a*(1 - e^2)/(1 + e*cos(f))
 """
     orbitaldistance(t, a, m, e)
 
-Compute the distance of a planet from its host
+Compute the distance of a planet from its host, assuming the planet is at periapsis at t=0
 """
 orbitaldistance(t, a, m, e) = orbitaldistance(a, trueanomaly(t, a, m, e), e)
 
 """
     orbit(a, m, e, N=1000)
 
-Create a distance time-series of `N` points for an elliptical orbit
+Create a distance time-series of `N` points for an elliptical orbit, returning vectors for time, distance, and true anomaly
 """
 function orbit(a, m, e, N::Int=1000)
     T = orbitalperiod(a, m)

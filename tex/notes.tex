@@ -1,0 +1,92 @@
+\documentclass[10pt]{article}
+\usepackage{amsmath}
+
+\title{Some Informal Notes for Radiative Transfer Code}
+\author{Mark Baum}
+
+\begin{document}
+
+\small
+
+\maketitle
+
+\section*{Pressure Coordinates}
+
+Get pressure coordinates by using the hydrostatic relation,
+\begin{equation}
+	\frac{dP}{dz} = -\rho g \, ,
+\end{equation}
+to replace $dz$ wherever it appears,
+\begin{equation}
+	dz = -\frac{dP}{\rho g} \, .
+\end{equation}
+Consider optical depth
+\begin{equation}
+	\tau	 = \int \sigma N dz \, ,
+\end{equation}
+where $\sigma$ is the absorption cross-section (m$^2$/molecule) and $N$ is the number density of the absorber (molecules/m$^3$). Switching to pressure coordinates yields
+\begin{equation}
+	\tau	 = \int \sigma N \frac{1}{\rho g} dP \, .
+	\label{tau}
+\end{equation}
+Then the ideal gas law can be used to substitute for both $N$ and $\rho$.
+\begin{align}
+	N &= \frac{P}{k_B T} \\[1ex]
+	\rho &= \frac{P \mu}{k_B T N_A}
+\end{align}
+where $\mu$ is the molar mass in kg/mole and $N_A$ is Avogadro's number. Because we have $N/\rho$ above in equation (\ref{tau}) for optical depth, lots of things cancel.
+\begin{equation}
+	\frac{N}{\rho} = \frac{P}{k_B T} \frac{k_B T N_A}{P \mu} = \frac{N_A}{\mu}
+\end{equation}
+Putting this into equation (\ref{tau}),
+\begin{equation}
+	\tau = \int \sigma \frac{N_A}{\mu g} dP \, .
+\end{equation}
+The negative sign in the original $dz=-dP/\rho g$ has been dropped for convenience. Obviously, the optical depth must be positive, so the coordinate switch probably brings in another negative sign, perhaps when integral limits are switched because low pressure is high altitude and vice versa.
+
+The same steps apply to the closely related Schwarzschild equation,
+\begin{equation}
+	dI = \sigma N [B_{\nu}(T) - I] dz \, ,
+\end{equation}
+expressed here in differential form. We have the same $N dz$ factor that, through the hydrostatic relation and ideal gas law, gets replaced by $N_A/\mu g$.
+\begin{equation}
+	dI = \sigma	\frac{N_A}{\mu g} [B_{\nu}(T) - I] dP \, .
+\end{equation}
+Important to remember that the molar mass here has units of kg/mole.
+
+\section*{log Pressure Coordinates}
+
+Sometimes there is a case for very high resolution in the upper atmosphere, per unit mass. To get that, log pressure coordinates can be used, which is essentially the same as using altitude directly but lets you keep the equations in terms of $P$. The same steps from above are applied, with one more. Simply use
+\begin{equation}
+	\frac{1}{P} dP = d\ln P
+\end{equation}
+or, rearranged
+\begin{equation}
+	dP = P d\ln P \, .
+\end{equation}
+Putting this into the optical depth and Schwarzschild equations,
+\begin{align}
+	\tau	 &= \int \sigma N \frac{1}{\rho g} P d\ln P \\[1em]
+	dI &= \sigma	\frac{N_A}{\mu g} [B_{\nu}(T) - I] P d\ln P \, .
+\end{align}
+It's the same as pressure coordinates, but multiplied by $P$. Then, of course, these equations must be integrated with the appropriate limits, $\ln(P_{\textrm{s}})$ and $\ln(P_{\textrm{toa}})$. Its important to consistently use the natural log, not log$_{10}$.
+
+\section*{Integrating Multiple Streams}
+
+In the absence of scattering, the total flux up or down in the atmosphere must account for irradiance at all angles in the hemisphere pointing up/down.
+\begin{equation}
+	F = \int_0^{2\pi} \int_0^{\pi/2} I(\theta	,\phi) \cos(\theta) \sin(\theta) d\theta d\phi \, ,
+\end{equation}
+where $\theta$ is the azimuthal angle (zero is straight up/down), $\phi$ is the ``latitude" angle going around the whole hemisphere. The cosine factor accounts for the angle of $I$ with respect to the horizontal planar surface that the flux is passing through. The sine factor simply comes out of the spherical integration, accounting for area attenuation near the very top of the hemisphere.
+
+Assuming streams are identical with respect to the latitude angle $\phi$, that dimension is trivial to integrate.
+\begin{equation}
+	F = 2\pi	 \int_0^{\pi/2} I(\theta) \cos(\theta) \sin(\theta) d\theta
+\end{equation}
+The azimuthal dimension generally must be integrated numerically. $I$ should be quite smooth with respect to $\theta$, so gaussian integration is a good way to do it. The flux is then
+\begin{equation}
+	F = 2\pi \sum_{i=0}^N I(\theta_i) w_i \cos(\theta_i) \sin(\theta_i)
+\end{equation}
+where $\theta_i$ are the gaussian quadrature nodes mapped to $[0,\pi/2]$ and $w_i$ are the appropriately scaled weights. For a given number of streams $N$, one can precompute the factors $2\pi w_i \cos(\theta_i) \sin(\theta_i)$.
+
+\end{document}

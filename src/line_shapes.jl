@@ -59,7 +59,7 @@ function surf!(σ::AbstractVector,
     @assert all(diff(ν) .> 0) "wavenumber vectors must be sorted in ascending order"
     L = length(νl)
     jstart = 1 #tracking index to avoid searching from beginning every time
-    for i = 1:length(ν)
+    for i = eachindex(ν)
         #find the first line that isn't cut off
         j = jstart
         while (j <= L) && cutline(ν[i], νl[j], Δνcut)

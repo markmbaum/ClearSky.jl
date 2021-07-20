@@ -75,8 +75,8 @@ export OpacityTable
 An `OpacityTable` is a simple object wrapping a [BichebyshevInterpolator](https://wordsworthgroup.github.io/BasicInterpolators.jl/stable/chebyshev/). Inside, the interpolator stores a grid of `log` cross-section values along `log` pressure coordinates and temperature coordinates. An `OpacityTable` behaves like a function, recieving a temperature and pressure. When called, it retrieves a cross-section from the interpolator, undoes the `log`, and returns it. When constructing a gas object, each wavenumber is allocated a unique `OpacityTable` for fast and accurate cross-section evaluation at any temperature and pressure inside the `AtmosphericDomain`. Generally, `OpacityTable` objects should be used indirectly through gas objects.
 """
 struct OpacityTable
-    itp::BichebyshevInterpolator
-    emp::Bool
+    Φ::BichebyshevInterpolator
+    empty::Bool
 end
 
 function OpacityTable(T::AbstractVector{<:Real},
@@ -84,23 +84,21 @@ function OpacityTable(T::AbstractVector{<:Real},
                       σ::AbstractArray{<:Real,2})
     if all(σ .== 0)
         #avoid evaluating log(0) and passing -Infs to the interp constructor
-        itp = BichebyshevInterpolator(T, log.(P), fill(0.0, size(σ)))
-        emp = true
+        Φ = BichebyshevInterpolator(T, log.(P), fill(0.0, size(σ)))
+        empty = true
     else
-        itp = BichebyshevInterpolator(T, log.(P), log.(σ))
-        emp = false
+        Φ = BichebyshevInterpolator(T, log.(P), log.(σ))
+        empty = false
     end
-    OpacityTable(itp, emp)
+    OpacityTable(Φ, empty)
 end
 
 #gets cross sections out of interpolators, un-logged, cm^2/molecule
 #also explicitly handles empty tables
 function (Π::OpacityTable)(T, P)::Float64
-    if Π.emp
-        return 0.0
-    end
+    Π.empty && return 0.0
     lnP = log(P)
-    lnσ = Π.itp(T, lnP)
+    lnσ = Π.Φ(T, lnP)
     return exp(lnσ)
 end
 
@@ -110,7 +108,7 @@ end
 function bake(sl::SpectralLines,
               Cfun::F,
               shape!::G,
-              Δνcut::Float64,
+              Δνcut::Real,
               ν::Vector{Float64},
               Ω::AtmosphericDomain
               )::Vector{OpacityTable} where {F, G<:Function}
@@ -145,7 +143,7 @@ function bake(sl::SpectralLines,
         end
     end
     if any(z)
-        @info "Zero cross-section values are mixed with non-zero values for the following wavenumbers for $(sl.name):\n\n$(ν[z])\n\n Likely, absorption is extremely weak in these regions. Absorption is being set to zero for all T and P at those wavenumbers to avoid non-smooth and inaccurate interpolation tables."
+        @info "Zero cross-section values are mixed with non-zero values for the following wavenumbers for $(sl.name):\n\n$(ν[z])\n\n Likely, absorption is extremely weak in these regions, causing underflow. Absorption is being set to zero for all temperatures and pressures at those wavenumbers to avoid non-smooth and inaccurate interpolation tables."
         σ[z,:,:] .= 0.0
     end
     #split the block and create interpolators for each ν
@@ -336,5 +334,5 @@ end
 
 #for full vectors of cross-sections with whatever gas
 function (g::AbstractGas)(T::Real, P::Real)::Vector{Float64}
-    Float64[g(i, T, P) for i ∈ 1:length(g.ν)]
+    [g(i, T, P) for i ∈ eachindex(g.ν)]
 end

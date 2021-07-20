@@ -7,5 +7,8 @@
 arch
 data
 ref
-tex
-working
+TODO.txt
+
+tex/*
+!tex/*.pdf
+!tex/*.tex

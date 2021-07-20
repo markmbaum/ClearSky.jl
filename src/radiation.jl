@@ -76,6 +76,8 @@ stefanboltzmann(T)::Float64 = 𝛔*T^4
 
 Compute the [planetary equilibrium temperature](https://en.wikipedia.org/wiki/Planetary_equilibrium_temperature), or equivalent blackbody temperature of a planet.
 
+``(\\frac{(1 - A)F}{4\\sigma})^{1/4}``
+
 # Arguments
 * `F`: stellar flux [W/m``^2``]
 * `A`: albedo
@@ -83,9 +85,11 @@ Compute the [planetary equilibrium temperature](https://en.wikipedia.org/wiki/Pl
 equilibriumtemperature(F, A)::Float64 = ((1 - A)*F/(4*𝛔))^(1/4)
 
 """
-    equilibriumtemperature(F, A)
+    equilibriumtemperature(L, A, R)
 
 Compute the [planetary equilibrium temperature](https://en.wikipedia.org/wiki/Planetary_equilibrium_temperature), or equivalent blackbody temperature of a planet.
+
+``(\\frac{(1 - A)L}{16 \\sigma \\pi R^2})^{1/4}``
 
 # Arguments
 * `L`: stellar luminosity [W]

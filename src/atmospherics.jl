@@ -89,7 +89,7 @@ function altitude(P, Pₛ, g, fT::T, fμ::U)::Float64 where {T,U}
         P₂ = hydrostatic(z₂, Pₛ, g, fT, fμ)
     end
     #find precise altitude where P = Pₜ
-    falseposition(z -> log(hydrostatic(z, Pₛ, g, fT, fμ)) - log(P), z₁, z₂)
+    falseposition((z,p) -> log(hydrostatic(z, Pₛ, g, fT, fμ)) - log(P), z₁, z₂)
 end
 
 """
@@ -97,13 +97,14 @@ end
 
 # Constructor
 
-    Hydrostatic(Pₛ, Pₜ, g, fT, fμ)
+    Hydrostatic(Pₛ, Pₜ, g, fT, fμ, N=1000)
 
 * `Pₛ`: surface pressure [Pa]
 * `Pₜ`: top of profile pressure [Pa]
 * `g`: gravitational acceleration [m/s``^2``]
 * `fT`: temperature [K] as a function of presssure, `fT(P)`
 * `fμ`: mean molar mass [kg/mole] as a function of temperature and pressure, `fμ(T,P)`
+* `N`: optional, number of interpolation nodes
 
 For a constant molar mass or temperature, you can use [anonymous functions](https://docs.julialang.org/en/v1/manual/functions/#man-anonymous-functions) directly. For example, to construct a hydrostatic pressure profile for a crude Earth-like atmosphere:
 
@@ -117,7 +118,7 @@ H.([0, 1e3, 1e4])
 ```
 """
 struct Hydrostatic
-    ϕ::LinearInterpolator
+    ϕ::LinearInterpolator{Float64,WeakBoundaries}
     zₜ::Float64
 end
 
@@ -130,20 +131,19 @@ function Hydrostatic(Pₛ, Pₜ, g, fT::T, fμ::U, N::Int=1000) where {T,U}
     #integrate to get a full pressure profile
     radau!(lnP, z, dlnPdz, log(Pₛ), 0, zₜ, (Pₛ, g, fT, fμ))
     #construct and return
-    Hydrostatic(LinearInterpolator(z, lnP), zₜ)
+    Hydrostatic(LinearInterpolator(z, lnP, WeakBoundaries()), zₜ)
 end
 
-function (H::Hydrostatic)(z)::Float64
-    @assert 0 <= z <= H.zₜ "altitude $z out of range [0,$(H.zₜ)]"
-    exp(H.ϕ(z, false))
-end
+(H::Hydrostatic)(z)::Float64 = exp(H.ϕ(z))
 
 """
     altitude(H::Hydrostatic, P)
 
 Compute the altitude at which a specific pressure occurs in a [`Hydrostatic`](@ref) pressure profile.
 """
-altitude(H::Hydrostatic, P)::Float64 = falseposition(z -> log(H(z)) - log(P), 0.0, H.zₜ)
+function altitude(H::Hydrostatic, P::Real)::Float64
+    falseposition((z,p) -> log(H(z)) - log(P), 0.0, H.zₜ)
+end
 
 #-------------------------------------------------------------------------------
 
@@ -246,7 +246,7 @@ end
 
 If `Tstrat` is greater than zero, the temperature profile will not drop below that temperature. If `Ptropo` is greater than zero, the temperature profile at pressures lower than `Ptropo` will be equal to the temperature at exactly `Ptropo`. `Tstrat` and `Ptropo` cannot be greater than zero simultaneously.
 
-The profile is evaluated along a number of pressure values in the atmosphere set by `N`. REVISE. Those points are then used to construct a cubic spline interpolator for efficient and accurate temperature calculation. Experience indicates that 1000 points is very accurate and also fast.
+The profile is evaluated along a number of pressure values in the atmosphere set by `N`. Those points are then used to construct a cubic spline interpolator for efficient and accurate temperature calculation. Experience indicates that 1000 points is very accurate and also fast.
 
 # Example
 
@@ -272,7 +272,7 @@ M.([3e4, 2e4, 1e4, 5e3])
 ```
 """
 struct MoistAdiabat <: AbstractAdiabat
-    ϕ::LinearInterpolator
+    ϕ::LinearInterpolator{Float64,WeakBoundaries}
     Pₛ::Float64
     Pₜ::Float64
     Tstrat::Float64
@@ -294,7 +294,8 @@ function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F,
     #integrate with in-place dense output
     radau!(T, ω, dTdω, Tₛ, ω[1], ω[end], param)
     #natural spline in log pressure coordinates
-    MoistAdiabat(LinearInterpolator(ω, T), Pₛ, Pₜ, Tstrat, Ptropo)
+    itp = LinearInterpolator(ω, T, WeakBoundaries())
+    MoistAdiabat(itp, Pₛ, Pₜ, Tstrat, Ptropo)
 end
 
 #------------------------------------
@@ -304,14 +305,14 @@ end
 temperature(Γ::DryAdiabat, P)::Float64 = Γ.Tₛ*(P/Γ.Pₛ)^(𝐑/(Γ.μ*Γ.cₚ))
 
 #coordinate conversion and interpolation
-temperature(Γ::MoistAdiabat, P)::Float64 = Γ.ϕ(P2ω(P), false)
+temperature(Γ::MoistAdiabat, P)::Float64 = Γ.ϕ(P2ω(P))
 
 #find the pressure corresponding to a temperature (ignores Tstrat, Ptropo)
 function pressure(Γ::AbstractAdiabat, T)::Float64
-    Tₛ = Γ(Γ.Pₛ)
-    Tₜ = Γ(Γ.Pₜ)
+    Tₛ = temperature(Γ, Γ.Pₛ)
+    Tₜ = temperature(Γ, Γ.Pₜ)
     @assert Tₛ >= T >= Tₜ "temperature $T K out of adiabat range [$(Tₛ),$(Tₜ)] K"
-    falseposition(P -> Γ(P) - T, Γ.Pₛ, Γ.Pₜ)
+    falseposition((P,p) -> temperature(Γ, P) - T, Γ.Pₛ, Γ.Pₜ)
 end
 
 function (Γ::AbstractAdiabat)(P)::Float64
@@ -349,11 +350,10 @@ function tropopause(Γ::AbstractAdiabat)::Tuple{Float64,Float64}
     if Γ.Tstrat != 0
         return Γ.Tstrat, pressure(Γ, Γ.Tstrat)
     end
-    throw("no stratosphere temperature or pressure has been defined (Tstrat/Ptropo)")
+    error("no stratosphere temperature or pressure has been defined (Tstrat/Ptropo)")
 end
 
 #-------------------------------------------------------------------------------
-
 export psatH2O, tsatCO2, ozonelayer
 
 """
@@ -395,13 +395,38 @@ Approximate the molar concentration of ozone in Earth's ozone layer using an 8 p
 """
 function ozonelayer(P, Cmax::Float64=8e-6)::Float64
     P = log(P)
-    P₁ = 10.146433731146518 #ln(25500)
-    P₂ = 7.3777589082278725 #ln(1600)
-    P₃ = 4.605170185988092  #ln(100)
+    P₁ = 10.146433731146518 #ln(25500) 
+    P₂ = 7.3777589082278725 #ln(1600)   
+    P₃ = 4.605170185988092  #ln(100)   
     if P₂ <= P <= P₁
         return Cmax*(P₁ - P)/(P₁ - P₂)
     elseif P₃ <= P <= P₂
         return Cmax*(P - P₃)/(P₂ - P₃)
     end
     return 0
+end
+
+#-------------------------------------------------------------------------------
+# function for uniform condensible concentration in stratosphere
+export adiabatconcentration
+
+function adiabatconcentration(Γ::AbstractAdiabat, psat::F)::Function where {F<:Function}
+    #insist on an isothermal stratosphere
+    @assert ((Γ.Ptropo != 0) | (Γ.Tstrat != 0)) "adiabat must have isothermal stratosphere"
+    #compute tropopause pressure and temperature
+    Tₜ, Pₜ = tropopause(Γ)
+    #compute saturation partial pressure at tropopause
+    Psatₜ = psat(Tₜ)
+    #create concentration function
+    let (Pₜ, Psatₜ) = (Pₜ, Psatₜ)
+        function(T, P)
+            if P >= Pₜ
+                Pₛ = psat(T)
+                C = Pₛ/(Pₛ + P)
+            else
+                C = Psatₜ/(Pₜ + Psatₜ)
+            end
+            return C
+        end
+    end
 end

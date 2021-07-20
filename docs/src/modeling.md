@@ -4,6 +4,8 @@
 opticaldepth
 transmittance
 outgoing
-incoming
-trapz
+topfluxes
+topimbalance
+GroupedAbsorber
+AcceleratedAbsorber
 ```

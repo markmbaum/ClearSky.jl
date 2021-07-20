@@ -18,8 +18,9 @@ include("gases.jl")
 include("collision_induced_absorption.jl")
 include("atmospherics.jl")
 include("radiation.jl")
+include("modeling_core.jl")
 include("modeling.jl")
-include("orbital.jl")
+include("orbits.jl")
 include("insolation.jl")
 
 using .Faddeyeva

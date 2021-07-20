@@ -148,8 +148,8 @@ struct CIATables
     #a Set object of the two gases involved
     formulae::Tuple{String,String}
     #interpolation structs
-    Φ::Vector{BilinearInterpolator}
-    ϕ::Vector{LinearInterpolator}
+    Φ::Vector{BilinearInterpolator{NoBoundaries}}
+    ϕ::Vector{LinearInterpolator{NoBoundaries}}
     #temperatures for singles in ϕ
     T::Vector{Float64}
     #whether to extrapolate (!)
@@ -187,7 +187,7 @@ function CIATables(cia::Vector{Dict{String,Any}};
         if length(T) == 1
             ν, k = ν[1], k[1]
             k[k .<= 0.0] .= 0.0
-            push!(ϕ, LinearInterpolator(ν, log.(k)))
+            push!(ϕ, LinearInterpolator(ν, log.(k), NoBoundaries()))
             push!(τ, T[1])
             if verbose
                 println("  ? single temperature CIA range found at $(T[1]) K, $(minimum(ν)) - $(maximum(ν)) cm^-1")
@@ -206,7 +206,7 @@ function CIATables(cia::Vector{Dict{String,Any}};
             #replace bizarre negative values with tiny values
             k[k .<= 0.0] .= floatmin(Float64)
             #construct an interpolator WITH THE LOG OF K for accuracy
-            push!(Φ, BilinearInterpolator(ν, T, log.(k)))
+            push!(Φ, BilinearInterpolator(ν, T, log.(k), NoBoundaries()))
         end
     end
     #make sure symbols are all the same and get the individual gas strings
@@ -249,12 +249,12 @@ end
 function (cia::CIATables)(ν, T)::Float64
     k = 0.0
     #look at each grid
-    for Φ in cia.Φ
+    for Φ ∈ cia.Φ
         if Φ.G.xa <= ν <= Φ.G.xb
             #inside wavenumber range
             if Φ.G.ya <= T <= Φ.G.yb
                 #interpolate inside the grid of data
-                k += exp(Φ(ν, T, false))
+                k += exp(Φ(ν, T))
             elseif cia.extrapolate
                 #otherwise extrapolate using flat boundary values, if desired
                 k += exp(Φ(ν, T > Φ.G.yb ? Φ.G.yb : Φ.G.ya))
@@ -263,10 +263,10 @@ function (cia::CIATables)(ν, T)::Float64
     end
     #optionally include the weird ranges at a single temperature
     if cia.singles
-        for ϕ in cia.ϕ
+        for ϕ ∈ cia.ϕ
             #wavenumber range
             if ϕ.r.xa <= ν <= ϕ.r.xb
-                k += exp(ϕ(ν, false))
+                k += exp(ϕ(ν))
             end
         end
     end
@@ -316,7 +316,7 @@ Compute a collision induced absorption cross-section after retrieving the total 
 * `P₁`: partial pressure of first gas [Pa]
 * `P₂`: partial pressure of second gas [Pa]
 """
-function cia(ν, x::CIATables, T, Pₐ, P₁, P₂)::Float64
+function cia(ν::Real, x::CIATables, T, Pₐ, P₁, P₂)::Float64
     #first retrieve the absorption coefficient from the interpolator
     k = x(ν, T) #cm^5/molecule^2
     #then compute the cross-section
@@ -376,7 +376,7 @@ Compute a collision induced absorption cross-section, retrieving the total absor
 * `g₁`: gas object representing the first component of the CIA pair
 * `g₂`: gas object representing the second component of the CIA pair
 """
-function cia(ν, x::CIATables, T, Pₐ, g₁::AbstractGas, g₂::AbstractGas)::Float64
+function cia(ν::Real, x::CIATables, T, Pₐ, g₁::AbstractGas, g₂::AbstractGas)::Float64
     P₁ = Pₐ*concentration(g₁, T, Pₐ)
     P₂ = Pₐ*concentration(g₂, T, Pₐ)
     cia(ν, x, T, Pₐ, P₁, P₂)
@@ -443,8 +443,8 @@ end
 
 function findgas(f::String, cianame::String, gases::AbstractGas...)
     idx = findall(g -> g.formula == f, gases)
-    @assert length(idx) > 0 "$cianame CIATables object has no matching gas objects"
-    @assert length(idx) == 1 "$cianame CIATables object has duplicate gas matches"
+    @assert length(idx) > 0 "pairing failed for $cianame CIA, gas $f is missing"
+    @assert length(idx) == 1 "pairing failed for $cianame CIA, duplicate $f gases found"
     return gases[idx[1]]
 end
 
