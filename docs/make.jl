@@ -27,5 +27,5 @@ makedocs(;
 deploydocs(;
     repo="github.com/wordsworthgroup/ClearSky.jl",
     devbranch="main",
-    versions=["stable"=>"v^"]
+    versions=["latest"=>"v#.#.#"]
 )
