@@ -1,11 +1,11 @@
-using Documenter
 using ClearSky
+using Documenter
 
 DocMeta.setdocmeta!(ClearSky, :DocTestSetup, :(using ClearSky); recursive=true)
 
 makedocs(;
     modules=[ClearSky],
-    authors="Mark Baum",
+    authors="Mark Baum <markmbaum@protonmail.com>",
     repo="https://github.com/markmbaum/ClearSky.jl/blob/{commit}{path}#{line}",
     sitename="ClearSky.jl",
     format=Documenter.HTML(;
