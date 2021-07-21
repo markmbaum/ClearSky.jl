@@ -45,26 +45,26 @@ function readcia(filename::String)
     #find locations of header lines
     hidx = findall(len->len == 100, L)
     #allocate a big array of dictionaries for each range of data
-    cia = Vector{Dict{String,Any}}(undef, length(hidx))
+    data = Vector{Dict{String,Any}}(undef, length(hidx))
     #parse the tables
     push!(hidx, length(lines) + 1)
     for i = 1:length(hidx) - 1
         #start the dictionary for this table
-        cia[i] = Dict{String,Any}()
+        data[i] = Dict{String,Any}()
         #line indices for the ith table
         ia = hidx[i]
         ib = hidx[i+1]
         #parse the header values
         line = lines[ia]
-        cia[i]["symbol"]    = strip(line[1:20])
-        cia[i]["νmin"]      = parse(Float64, line[21:30])
-        cia[i]["νmax"]      = parse(Float64, line[31:40])
-        cia[i]["npts"]      = parse(Int64, line[41:47])
-        cia[i]["T"]         = parse(Float64, line[48:54])
-        cia[i]["maxcia"]    = parse(Float64, line[55:64])
-        cia[i]["res"]       = parse(Float64, line[65:70])
-        cia[i]["comments"]  = strip(line[71:97])
-        cia[i]["reference"] = parse(Int64, line[98:100])
+        data[i]["symbol"]    = strip(line[1:20])
+        data[i]["νmin"]      = parse(Float64, line[21:30])
+        data[i]["νmax"]      = parse(Float64, line[31:40])
+        data[i]["npts"]      = parse(Int64, line[41:47])
+        data[i]["T"]         = parse(Float64, line[48:54])
+        data[i]["maxcia"]    = parse(Float64, line[55:64])
+        data[i]["res"]       = parse(Float64, line[65:70])
+        data[i]["comments"]  = strip(line[71:97])
+        data[i]["reference"] = parse(Int64, line[98:100])
         #read the data columns
         table = lines[ia+1:ib-1]
         L = length(table)
@@ -87,10 +87,10 @@ function readcia(filename::String)
             k[j] = parse(Float64, line[nc:nd-1])
         end
         #add to the dictionary
-        cia[i]["ν"] = ν
-        cia[i]["k"] = k
+        data[i]["ν"] = ν
+        data[i]["k"] = k
     end
-    return cia
+    return data
 end
 
 """
@@ -158,7 +158,7 @@ struct CIATables
     singles::Bool
 end
 
-function CIATables(cia::Vector{Dict{String,Any}};
+function CIATables(data::Vector{Dict{String,Any}};
                    extrapolate::Bool=false,
                    singles::Bool=false,
                    verbose::Bool=true)
@@ -166,9 +166,9 @@ function CIATables(cia::Vector{Dict{String,Any}};
         println("creating CIATables")
     end
     #pull out wavenumber ranges and temperatures for each grid
-    νmin = map(x->x["νmin"], cia)
-    νmax = map(x->x["νmax"], cia)
-    T = map(x->x["T"], cia)
+    νmin = map(x->x["νmin"], data)
+    νmax = map(x->x["νmax"], data)
+    T = map(x->x["T"], data)
     #select unique wavenumber ranges and sort 'em
     νranges = sort(unique(zip(νmin, νmax)), by=x->x[1])
     n = length(νranges)
@@ -179,10 +179,10 @@ function CIATables(cia::Vector{Dict{String,Any}};
     for i = 1:n
         νmin[i], νmax[i] = νranges[i]
         #pull out the data for this wavenumber range
-        idx = findall(x->(x["νmin"] ≈ νmin[i]) & (x["νmax"] ≈ νmax[i]), cia)
-        T = map(x->x["T"], cia[idx])
-        ν = map(x->x["ν"], cia[idx])
-        k = map(x->x["k"], cia[idx])
+        idx = findall(x->(x["νmin"] ≈ νmin[i]) & (x["νmax"] ≈ νmax[i]), data)
+        T = map(x->x["T"], data[idx])
+        ν = map(x->x["ν"], data[idx])
+        k = map(x->x["k"], data[idx])
         #if there is only one range, make a linear interpolation
         if length(T) == 1
             ν, k = ν[1], k[1]
@@ -210,18 +210,18 @@ function CIATables(cia::Vector{Dict{String,Any}};
         end
     end
     #make sure symbols are all the same and get the individual gas strings
-    symbols = unique(map(x->x["symbol"], cia))
+    symbols = unique(map(x->x["symbol"], data))
     @assert length(symbols) == 1
     symbol = symbols[1]
     formulae = Tuple(map(String, split(symbol, '-')))
     #construct
-    cia = CIATables(symbol, formulae, Φ, ϕ, τ, extrapolate, singles)
+    tables = CIATables(symbol, formulae, Φ, ϕ, τ, extrapolate, singles)
     #print some info if desired
     if verbose
-        println("  formulae: $(cia.formulae[1]) & $(cia.formulae[2])")
-        Φ = cia.Φ
+        println("  formulae: $(tables.formulae[1]) & $(tables.formulae[2])")
+        Φ = tables.Φ
         n = length(Φ)
-        ϕ = cia.ϕ
+        ϕ = tables.ϕ
         m = length(ϕ)
         println("  $(n+m) absorption region(s)")
         for i = 1:n
@@ -230,10 +230,10 @@ function CIATables(cia::Vector{Dict{String,Any}};
         end
         for i = 1:m
             println("    $(i+n)) ν = $(ϕ[i].r.xa) - $(ϕ[i].r.xb) cm^-1")
-            println("       T = $(cia.T[i]) (single)")
+            println("       T = $(tables.T[i]) (single)")
         end
     end
-    return cia
+    return tables
 end
 
 function CIATables(fn::String;
@@ -246,24 +246,24 @@ end
 #-------------------------------------------------------------------------------
 # interpolating k, the raw CIA values
 
-function (cia::CIATables)(ν, T)::Float64
+function (tables::CIATables)(ν, T)::Float64
     k = 0.0
     #look at each grid
-    for Φ ∈ cia.Φ
+    for Φ ∈ tables.Φ
         if Φ.G.xa <= ν <= Φ.G.xb
             #inside wavenumber range
             if Φ.G.ya <= T <= Φ.G.yb
                 #interpolate inside the grid of data
                 k += exp(Φ(ν, T))
-            elseif cia.extrapolate
+            elseif tables.extrapolate
                 #otherwise extrapolate using flat boundary values, if desired
                 k += exp(Φ(ν, T > Φ.G.yb ? Φ.G.yb : Φ.G.ya))
             end
         end
     end
     #optionally include the weird ranges at a single temperature
-    if cia.singles
-        for ϕ ∈ cia.ϕ
+    if tables.singles
+        for ϕ ∈ tables.ϕ
             #wavenumber range
             if ϕ.r.xa <= ν <= ϕ.r.xb
                 k += exp(ϕ(ν))

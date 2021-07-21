@@ -28,5 +28,5 @@ The precession angle `p` is defined so that when ``p=0``, the northern hemispher
 
 ```@autodocs
 Modules = [ClearSky]
-Pages   = ["orbital.jl", "insolation.jl"]
+Pages   = ["orbits.jl", "insolation.jl"]
 ```

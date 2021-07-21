@@ -5,6 +5,7 @@ evaluation of the real part only and one for the whole complex result. The
 approximation is due to Mofreh R. Zaghloul, as descriped in the paper:
 * Mofreh R. Zaghloul. 2017. Algorithm 985: Simple, Efficient, and Relatively Accurate Approximation for the Evaluation of the Faddeyeva Function. ACM Trans. Math. Softw. 44, 2, Article 22 (August 2017), 9 pages. https://doi.org/10.1145/3119904
 """
+
 module Faddeyeva
 
 export faddeyeva
@@ -82,6 +83,11 @@ function regionVI(x::Real, y::Real)::Complex
     r/t
 end
 
+"""
+    faddeyeva(z::Complex)
+
+Evaluate the [Faddeyeva function](https://en.wikipedia.org/wiki/Faddeeva_function) with a complex argument, returning a complex number.
+"""
 function faddeyeva(z::Complex)::Complex
 
     x = real(z)
@@ -131,6 +137,11 @@ function faddeyeva(z::Complex)::Complex
 end
 
 #real arguments representint z = x + im*y, returning only the real part
+"""
+    faddeyeva(x::Real, y::Real)
+
+Evaluate only the real part of the [Faddeyeva function](https://en.wikipedia.org/wiki/Faddeeva_function) from the complex argument ``x + iy``
+"""
 function faddeyeva(x::Real, y::Real)::Float64
 
     x² = x*x

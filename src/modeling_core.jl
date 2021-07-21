@@ -190,7 +190,7 @@ end
 
 noabsorption(aa::AcceleratedAbsorber, i::Int)::Bool = aa.empty[i]
 
-function noabsorption(ga::GroupedAbsorber)::Vector{Bool}
+function noabsorption(ga::AcceleratedAbsorber)::Vector{Bool}
     [noabsorption(aa, i) for i ∈ eachindex(ga.ν)]
 end
 

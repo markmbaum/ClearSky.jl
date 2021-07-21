@@ -24,5 +24,6 @@ include("orbits.jl")
 include("insolation.jl")
 
 using .Faddeyeva
+export faddeyeva
 
 end

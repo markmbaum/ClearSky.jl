@@ -6,7 +6,7 @@ The model is designed to use the [HITRAN](https://hitran.org/) database of spect
 
 To work with spectral line data directly, use the [`readpar`](@ref) function to load the data. This function simply parses the fixed-width file into a dictionary of vectors with the appropriate data types. For more information, see the [`readpar`](@ref) documentation.
 
-If you plan to compute line shapes directly, read par files into [`SpectralLines`](@ref) objects. The constructor reads files using [`readpar`](@ref) then rearranges it for line shape calculations. Unnecessary information is dropped and the molecule name, formula, and molar masses are assigned. To compute line shapes, see [Computing Line Shapes](computing_line_shapes.md).
+If you plan to compute line shapes directly, read par files into [`SpectralLines`](@ref) objects. The constructor reads files using [`readpar`](@ref) then rearranges it for line shape calculations. Unnecessary information is dropped and the molecule name, formula, and molar masses are assigned. To compute line shapes, see [Line Shapes](line_shapes.md).
 
 For only high-level calculations, `par` files can also be loaded directly into [gas objects](gas_objects.md).
 
@@ -21,11 +21,18 @@ The model also makes it easy to include CIA data from HITRAN. These files can be
 
 Like the line data, there is a function for reading these CIA files without doing anything else. The [`readcia`](@ref) function reads a `cia` file into a vector of dictionaries. Each dictionary represents a table of absorption data. This is the raw data, but it is relatively hard to work with.
 
-A [`CIATables`](@ref) object arranges each table of absorption data into an interpolator and makes it easy to compute the CIA absorption coefficient at any wavenumber and temperature. Also, in combination with the [`cia`](@ref) function, a [`CIATables`](@ref) can be used to compute absorption cross-sections from provided wavenumber, temperature, and partial pressures.
+A [`CIATables`](@ref) object arranges each table of absorption data into an interpolator and makes it easy to compute the CIA absorption coefficient at any wavenumber and temperature.
+
+A [`CIA`](@ref) struct links a [`CIATables`](@ref) object with the gasses that are inducing absorption. Because concentrations are defined in the gas objects, [`CIA`](@ref) objects can be used to compute induced absorption cross-sections with only the wavenumber, temperature, and pressure.
+
+The [`cia`](@ref) function also provides a number of methods for computing induced cross-sections.
 
 -----
 
 ```@docs
 readcia
 CIATables
+CIA
+cia
+cia!
 ```

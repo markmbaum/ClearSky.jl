@@ -78,5 +78,6 @@ PHCO2!
 ## Other
 
 ```@docs
+faddeyeva
 scaleintensity
 ```

@@ -6,5 +6,6 @@ Welcome to the documentation for `ClearSky`, a line-by-line radiative transfer m
 * [Computing Line Shapes](line_shapes.md)
 * [Gas Objects](gas_objects.md)
 * [Atmospheric Profiles](atmospheric_profiles.md)
+* [Radiation](radiation.md)
 * [Modeling](modeling.md)
 * [Orbits and Insolation](orbits_insolation.md)
