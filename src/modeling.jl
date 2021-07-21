@@ -123,6 +123,7 @@ function topfluxes(Pₛ::Real,
                    tol::Float64=1e-5)::NTuple{2,Vector{Float64}} where {Q,R,S}
     #setup
     checkpressures(absorber, Pₛ, Pₜ)
+    checkazimuth(θ)
     ν, nν = absorber.ν, absorber.nν
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
     ι₁, ι₂ = P2ι(Pₜ, Pₛ)

@@ -159,6 +159,7 @@ end
 #for testing opacity table errors
 
 export opacityerror
+
 function opacityerror(Π::OpacityTable,
                       Ω::AtmosphericDomain,
                       sl::SpectralLines,
