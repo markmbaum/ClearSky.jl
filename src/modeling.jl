@@ -69,7 +69,7 @@ Compute outgoing monochromatic radiative fluxes [W/m``^2``/cm``^{-1}``], line-by
 * `fμ`: mean molar mass as a function of temperature [K] and pressure [Pa], `fμ(T,P)`
 * `absorbers`: at least one [gas object](gas_objects.md) and any number of [`CIATables`](@ref) and functions in the form σ(ν, T, P)
 
-The keyword argument `nstream` specifies how many independent streams, or beam angles through the atmosphere, to integrate. The keyword argument `tol` is a numerical error tolerance passed to the [`radau`](https://github.com/wordsworthgroup/ScalarRadau.jl) integrator.
+The keyword argument `nstream` specifies how many independent streams, or beam angles through the atmosphere, to integrate. The keyword argument `tol` is a numerical error tolerance passed to the [`radau`](https://github.com/markmbaum/ScalarRadau.jl) integrator.
 """
 function outgoing(Pₛ::Real,
                   Pₜ::Real,

@@ -17,7 +17,7 @@ SpectralLines
 
 ## Collision Induced Absorption (CIA)
 
-The model also makes it easy to include CIA data from HITRAN. These files can be  [downloaded directly](https://hitran.org/cia/) or all at once using the [`download_cia.py`](https://github.com/wordsworthgroup/ClearSky.jl/blob/main/scripts/download_cia.py) script. Each file contains potentially many tables of absorption data at different wavenumbers and temperatures.
+The model also makes it easy to include CIA data from HITRAN. These files can be  [downloaded directly](https://hitran.org/cia/) or all at once using the [`download_cia.py`](https://github.com/markmbaum/ClearSky.jl/blob/main/scripts/download_cia.py) script. Each file contains potentially many tables of absorption data at different wavenumbers and temperatures.
 
 Like the line data, there is a function for reading these CIA files without doing anything else. The [`readcia`](@ref) function reads a `cia` file into a vector of dictionaries. Each dictionary represents a table of absorption data. This is the raw data, but it is relatively hard to work with.
 

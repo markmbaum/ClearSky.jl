@@ -94,7 +94,7 @@ function readcia(filename::String)
 end
 
 """
-Organizing type for collision induced absorption data, with data tables loaded into [interpolators](https://wordsworthgroup.github.io/BasicInterpolators.jl/stable/).
+Organizing type for collision induced absorption data, with data tables loaded into [interpolators](https://markmbaum.github.io/BasicInterpolators.jl/stable/).
 
 | Field | Type | Description |
 | ----- | :--- | :---------- |
@@ -106,7 +106,7 @@ Organizing type for collision induced absorption data, with data tables loaded i
 | `extrapolate` | `Bool` | whether to extrapolate using flat boundaries from the coefficient grids in `Φ` |
 | `singles` | `Bool` | whether to use the single ranges in `ϕ` at all |
 
-The interpolator objects are described in the [`BasicInterpolators.jl`](https://wordsworthgroup.github.io/BasicInterpolators.jl/stable/) documentation.
+The interpolator objects are described in the [`BasicInterpolators.jl`](https://markmbaum.github.io/BasicInterpolators.jl/stable/) documentation.
 
 # Constructors
 

@@ -72,7 +72,7 @@ end
 export OpacityTable
 
 """
-An `OpacityTable` is a simple object wrapping a [BichebyshevInterpolator](https://wordsworthgroup.github.io/BasicInterpolators.jl/stable/chebyshev/). Inside, the interpolator stores a grid of `log` cross-section values along `log` pressure coordinates and temperature coordinates. An `OpacityTable` behaves like a function, recieving a temperature and pressure. When called, it retrieves a cross-section from the interpolator, undoes the `log`, and returns it. When constructing a gas object, each wavenumber is allocated a unique `OpacityTable` for fast and accurate cross-section evaluation at any temperature and pressure inside the `AtmosphericDomain`. Generally, `OpacityTable` objects should be used indirectly through gas objects.
+An `OpacityTable` is a simple object wrapping a [BichebyshevInterpolator](https://markmbaum.github.io/BasicInterpolators.jl/stable/chebyshev/). Inside, the interpolator stores a grid of `log` cross-section values along `log` pressure coordinates and temperature coordinates. An `OpacityTable` behaves like a function, recieving a temperature and pressure. When called, it retrieves a cross-section from the interpolator, undoes the `log`, and returns it. When constructing a gas object, each wavenumber is allocated a unique `OpacityTable` for fast and accurate cross-section evaluation at any temperature and pressure inside the `AtmosphericDomain`. Generally, `OpacityTable` objects should be used indirectly through gas objects.
 """
 struct OpacityTable
     Φ::BichebyshevInterpolator

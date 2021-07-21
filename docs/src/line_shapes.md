@@ -29,7 +29,7 @@ must be evaluated. The necessary information is provided by HITRAN [for every is
 
 `ClearSky` evaluates the ratio accurately and automatically inside the [`scaleintensity`](@ref) function.
 
-To facilitate this, the [`molparam.py`](https://github.com/wordsworthgroup/ClearSky.jl/blob/main/scripts/molparam.py) script was used to download Q data for each isotopologue, generate high-accuracy interpolating Chebyshev polynomials for each one, and write the information to a Julia source file called [`molparam.jl`](https://github.com/wordsworthgroup/ClearSky.jl/blob/main/src/molparam.jl). The pre-computed interpolating coefficients are defined directly in source code, allowing rapid and accurate evaluation of the TIPS ratio. The interpolating functions are guaranteed to reproduce the provided data with less than 1 % error between 25 and 1000 K.
+To facilitate this, the [`molparam.py`](https://github.com/markmbaum/ClearSky.jl/blob/main/scripts/molparam.py) script was used to download Q data for each isotopologue, generate high-accuracy interpolating Chebyshev polynomials for each one, and write the information to a Julia source file called [`molparam.jl`](https://github.com/markmbaum/ClearSky.jl/blob/main/src/molparam.jl). The pre-computed interpolating coefficients are defined directly in source code, allowing rapid and accurate evaluation of the TIPS ratio. The interpolating functions are guaranteed to reproduce the provided data with less than 1 % error between 25 and 1000 K.
 
 -----
 

@@ -6,11 +6,11 @@ DocMeta.setdocmeta!(ClearSky, :DocTestSetup, :(using ClearSky); recursive=true)
 makedocs(;
     modules=[ClearSky],
     authors="Mark Baum",
-    repo="https://github.com/wordsworthgroup/ClearSky.jl/blob/{commit}{path}#{line}",
+    repo="https://github.com/markmbaum/ClearSky.jl/blob/{commit}{path}#{line}",
     sitename="ClearSky.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://wordsworthgroup.github.io/ClearSky.jl",
+        canonical="https://markmbaum.github.io/ClearSky.jl",
         assets=String[],
     ),
     pages=[
@@ -25,7 +25,7 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/wordsworthgroup/ClearSky.jl",
+    repo="github.com/markmbaum/ClearSky.jl",
     devbranch="main",
     versions=nothing
 )
