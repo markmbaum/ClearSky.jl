@@ -42,7 +42,11 @@ end
 """
     hydrostatic(z, Pₛ, g, fT, fμ)
 
-Compute the hydrostatic pressure [Pa] at a specific altitude using arbitrary atmospheric profiles of temperature and mean molar mass
+Compute the hydrostatic pressure [Pa] at a specific altitude using arbitrary atmospheric profiles of temperature and mean molar mass. This function integrates the hydrostatic relation,
+
+``\\frac{dP}{dz} = \\frac{\\mu g}{R T}
+
+from the surface to a height of ``z``, where ``R`` is the [universial gas constant](https://en.wikipedia.org/wiki/Gas_constant).
 
 # Arguments
 
@@ -66,7 +70,7 @@ end
 """
     altitude(P, Pₛ, g, fT, fμ)
 
-Compute the altitude [m] at which a specific hydrostatic pressure occurs using arbitrary atmospheric profiles of temperature and mean molar mass
+Compute the altitude [m] at which a specific hydrostatic pressure occurs using arbitrary atmospheric profiles of temperature and mean molar mass. This function applies a root finder to the [`hydrostatic`](@ref) function.
 
 # Arguments
 
@@ -89,11 +93,11 @@ function altitude(P, Pₛ, g, fT::T, fμ::U)::Float64 where {T,U}
         P₂ = hydrostatic(z₂, Pₛ, g, fT, fμ)
     end
     #find precise altitude where P = Pₜ
-    falseposition((z,p) -> log(hydrostatic(z, Pₛ, g, fT, fμ)) - log(P), z₁, z₂)
+    regulafalsi((z,p) -> log(hydrostatic(z, Pₛ, g, fT, fμ)) - log(P), z₁, z₂)
 end
 
 """
-[Function-like type](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects) for initializing and evaluating a hydrostatic pressure profile with arbitrary temperature and mean molar mass profiles. A `Hydrostatic` object maps altitude to pressure.
+[Function-like type](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects) for initializing and evaluating a hydrostatic pressure profile with arbitrary temperature and mean molar mass profiles. A `Hydrostatic` object maps altitude to pressure. A pressure vs altitude profile is generated and used for interpolation.
 
 # Constructor
 
@@ -139,15 +143,15 @@ end
 """
     altitude(H::Hydrostatic, P)
 
-Compute the altitude at which a specific pressure occurs in a [`Hydrostatic`](@ref) pressure profile.
+Compute the altitude at which a specific pressure occurs in a [`Hydrostatic`](@ref) pressure profile. A root finder is applied to the object.
 """
 function altitude(H::Hydrostatic, P::Real)::Float64
-    falseposition((z,p) -> log(H(z)) - log(P), 0.0, H.zₜ)
+    regulafalsi((z,p) -> log(H(z)) - log(P), 0.0, H.zₜ)
 end
 
 #-------------------------------------------------------------------------------
 
-#general function for adiabat with one condensable in bulk non-condensable
+#general function for adiabat with one condensible in bulk non-condensible
 function dTdω(ω, T, cₚₙ, cₚᵥ, Rₙ, Rᵥ, L, psat::F)::Float64 where {F}
     #molar mixing ratio of condensible
     α = psat(T)/ω2P(ω)
@@ -178,20 +182,20 @@ end
 #------------------------------------
 
 """
-[Function-like type](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects) for initializing and evaluating a dry adiabatic temperature profile. Optional uniform upper atmospheric temperature below a specified temperature or pressure.
+[Function-like type](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects) for initializing and evaluating a dry adiabatic temperature profile. Optionally, a uniform upper atmospheric temperature can be set below a specified temperature or pressure.
 
 # Constructor
 
-    DryAdiabat(Tₛ, Pₛ, cₚ, μ, Pₜ=$PMIN; Tstrat=0.0, Ptropo=0.0)
+    DryAdiabat(Tₛ, Pₛ, cₚ, μ; Tstrat=0.0, Ptropo=0.0, Pₜ=$PMIN)
 
 * `Tₛ`: surface temperature [K]
 * `Pₛ`: surface pressure [K]
-* `Pₜ`: highest allowable pressure (can be small but not zero) [Pa]
 * `cₚ`: specific heat of the atmosphere [J/kg/K]
 * `μ`: molar mass of the atmosphere [kg/mole]
-* `Pₜ`: highest pressure in the temperature profile (should generally be small to avoid evaluating out of range) [Pa]
 
-If `Tstrat` is greater than zero, the temperature profile will not drop below that temperature. If `Ptropo` is greater than zero, the temperature profile at pressures lower than `Ptropo` will be equal to the temperature at exactly `Ptropo`. `Tstrat` and `Ptropo` cannot be greater than zero simultaneously.
+If `Tstrat` is greater than zero, the temperature profile will never drop below that temperature. If `Ptropo` is greater than zero, the temperature profile at pressures lower than `Ptropo` will be equal to the temperature at exactly `Ptropo`. `Tstrat` and `Ptropo` cannot both greater than zero.
+
+`Pₜ` defines the highest pressure [Pa] in the temperature profile. If should generally be small but cannot be zero.
 
 # Example
 
@@ -220,7 +224,7 @@ struct DryAdiabat <: AbstractAdiabat
     Ptropo::Float64
 end
 
-function DryAdiabat(Tₛ, Pₛ, cₚ, μ, Pₜ=PMIN; Tstrat=0, Ptropo=0)
+function DryAdiabat(Tₛ, Pₛ, cₚ, μ; Tstrat=0, Ptropo=0, Pₜ=PMIN)
     checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
     DryAdiabat(Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo)
 end
@@ -232,7 +236,7 @@ end
 
 # Constructor
 
-    MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat, Pₜ=$PMIN; Tstrat=0, Ptropo=0, N=1000)
+    MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat; Tstrat=0, Ptropo=0, N=1000, Pₜ=$PMIN)
 
 * `Tₛ`: surface temperature [K]
 * `Pₛ`: surface pressure [K]
@@ -242,9 +246,10 @@ end
 * `μᵥ`: molar mass of the condensible atmospheric component [kg/mole]
 * `L`: condsible component's latent heat of vaporization [J/kg]
 * `psat`: function defining the saturation vapor pressure for a given temperature, `psat(T)`
-* `Pₜ`: highest pressure in the temperature profile (should generally be small to avoid evaluating pressures out of range) [Pa]
 
-If `Tstrat` is greater than zero, the temperature profile will not drop below that temperature. If `Ptropo` is greater than zero, the temperature profile at pressures lower than `Ptropo` will be equal to the temperature at exactly `Ptropo`. `Tstrat` and `Ptropo` cannot be greater than zero simultaneously.
+If `Tstrat` is greater than zero, the temperature profile will never drop below that temperature. If `Ptropo` is greater than zero, the temperature profile at pressures lower than `Ptropo` will be equal to the temperature at exactly `Ptropo`. `Tstrat` and `Ptropo` cannot both greater than zero.
+
+`Pₜ` defines the highest pressure [Pa] in the temperature profile. If should generally be small but cannot be zero.
 
 The profile is evaluated along a number of pressure values in the atmosphere set by `N`. Those points are then used to construct a cubic spline interpolator for efficient and accurate temperature calculation. Experience indicates that 1000 points is very accurate and also fast.
 
@@ -279,11 +284,11 @@ struct MoistAdiabat <: AbstractAdiabat
     Ptropo::Float64
 end
 
-function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F,
-                      Pₜ=PMIN;
+function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F;
                       Tstrat=0.0,
                       Ptropo=0.0,
-                      N::Int=1000) where {F<:Function}
+                      N::Int=1000,
+                      Pₜ=PMIN) where {F}
     checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
     #interpolation knots and output vector
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
@@ -301,28 +306,21 @@ end
 #------------------------------------
 #general operations with an adiabat
 
-#direct calculation
+#direct calculation without temperature/pressure floors
 temperature(Γ::DryAdiabat, P)::Float64 = Γ.Tₛ*(P/Γ.Pₛ)^(𝐑/(Γ.μ*Γ.cₚ))
 
-#coordinate conversion and interpolation
+#direct calculation without temperature/pressure floors
 temperature(Γ::MoistAdiabat, P)::Float64 = Γ.ϕ(P2ω(P))
 
-#find the pressure corresponding to a temperature (ignores Tstrat, Ptropo)
+#find the pressure corresponding to a temperature, ignoring Tstrat+Ptropo
 function pressure(Γ::AbstractAdiabat, T)::Float64
     Tₛ = temperature(Γ, Γ.Pₛ)
     Tₜ = temperature(Γ, Γ.Pₜ)
     @assert Tₛ >= T >= Tₜ "temperature $T K out of adiabat range [$(Tₛ),$(Tₜ)] K"
-    falseposition((P,p) -> temperature(Γ, P) - T, Γ.Pₛ, Γ.Pₜ)
+    regulafalsi((P,p) -> temperature(Γ, P) - T, Γ.Pₛ, Γ.Pₜ)
 end
 
 function (Γ::AbstractAdiabat)(P)::Float64
-    #check bounds
-    if (P < Γ.Pₜ) && !(P ≈ Γ.Pₜ)
-        throw("Adiabat defined within $(Γ.Pₜ) and $(Γ.Pₛ) Pa, $P Pa is too low.")
-    end
-    if (P > Γ.Pₛ) && !(P ≈ Γ.Pₛ)
-        throw("Adiabat defined within $(Γ.Pₜ) and $(Γ.Pₛ) Pa, $P Pa is too high.")
-    end
     #check if pressure is below tropopause
     if P < Γ.Ptropo
         return temperature(Γ, Γ.Ptropo)
@@ -341,7 +339,7 @@ end
 """
     tropopause(Γ::AbstractAdiabat)
 
-Compute the temperature [K] and pressure [Pa] at which the tropopause occurs in an adiabatic temperature profile. This function can be called on a `DryAdiabat` or a `MoistAdiabat` if it was constructed with nonzero `Tstrat` or `Ptropo`. Returns a tuple, `(T,P)`.
+Compute the temperature [K] and pressure [Pa] at which the tropopause occurs in an adiabatic temperature profile. This function can be called on a `DryAdiabat` or a `MoistAdiabat` if it was constructed with nonzero `Tstrat` or `Ptropo`. Returns the tuple `(T,P)`.
 """
 function tropopause(Γ::AbstractAdiabat)::Tuple{Float64,Float64}
     if Γ.Ptropo != 0
@@ -359,9 +357,11 @@ export psatH2O, tsatCO2, ozonelayer
 """
     psatH2O(T)
 
-Compute the saturation partial pressure of water vapor at a certain temperature using expressions from
+Compute the saturation partial pressure of water vapor at a given temperature using expressions from
 
 * [Murphy, D. M. & Koop, T. Review of the vapour pressures of ice and supercooled water for atmospheric applications. Q. J. R. Meteorol. Soc. 131, 1539–1565 (2005).](https://rmets.onlinelibrary.wiley.com/doi/10.1256/qj.04.94)
+
+This function uses equation 10 in the paper above when ``T >= 273.15`` K and equation 7 otherwise.
 """
 function psatH2O(T)::Float64
     a = log(T)
@@ -381,17 +381,26 @@ end
 """
     tsatCO2(P)
 
-Compute the saturation pressure of carbon dioxide at a certain pressure using an expression from Fanale et al. (1982)
+Compute the saturation pressure of carbon dioxide at a certain pressure using equation 19 from
+
+* [Fanale, F. P., Salvail, J. R., Bruce Banerdt, W. & Steven Saunders, R. Mars: The regolith-atmosphere-cap system and climate change. Icarus 50, 381–407 (1982)](https://doi.org/10.1016/0019-1035(82)90131-2)
+
+The equation is inverted to express temperature as a function of pressure.
 """
 function tsatCO2(P)::Float64
     @assert P <= 518000.0 "Pressure cannot be above 518000 Pa for CO2 saturation temperature"
-    -3167.8/(log(0.01*P) - 23.23)
+    A = 1.2264e12 #[Pa]
+    B = -3167.8 #[K]
+    B/log(P/A)
 end
 
 """
     ozonelayer(P, Cmax=8e-6)
 
-Approximate the molar concentration of ozone in Earth's ozone layer using an 8 ppm peak at 1600 Pa which falls to zero at 100 Pa and 25500 Pa. Peak concentration is defined by `Cmax`.
+Approximate the molar concentration of ozone in Earth's ozone layer using an 8 ppm peak at 1600 Pa which falls to zero at 100 Pa and 25500 Pa. Peak concentration is defined by `Cmax`. This approximation is discussed in
+
+* Jacob, D. Introduction to Atmospheric Chemistry. (Princeton University Press, 1999).
+
 """
 function ozonelayer(P, Cmax::Float64=8e-6)::Float64
     P = log(P)
@@ -407,21 +416,26 @@ function ozonelayer(P, Cmax::Float64=8e-6)::Float64
 end
 
 #-------------------------------------------------------------------------------
-# function for uniform condensible concentration in stratosphere
-export adiabatconcentration
 
-function adiabatconcentration(Γ::AbstractAdiabat, psat::F)::Function where {F<:Function}
+export condensibleprofile
+
+"""
+    condensibleprofile(Γ::AbstractAdiabat, psat)
+
+Create a new function determining the temperature dependent concentration of a condensible gas that has a uniform stratospheric concentration. The new function references an existing adiabatic profile and a function for the partial pressure `ppartial(T)`.
+"""
+function condensibleprofile(Γ::AbstractAdiabat, ppartial::F)::Function where {F}
     #insist on an isothermal stratosphere
     @assert ((Γ.Ptropo != 0) | (Γ.Tstrat != 0)) "adiabat must have isothermal stratosphere"
     #compute tropopause pressure and temperature
     Tₜ, Pₜ = tropopause(Γ)
     #compute saturation partial pressure at tropopause
-    Psatₜ = psat(Tₜ)
+    Psatₜ = ppartial(Tₜ)
     #create concentration function
-    let (Pₜ, Psatₜ) = (Pₜ, Psatₜ)
+    f = let (Pₜ, Psatₜ) = (Pₜ, Psatₜ)
         function(T, P)
             if P >= Pₜ
-                Pₛ = psat(T)
+                Pₛ = ppartial(T)
                 C = Pₛ/(Pₛ + P)
             else
                 C = Psatₜ/(Pₜ + Psatₜ)
@@ -429,4 +443,55 @@ function adiabatconcentration(Γ::AbstractAdiabat, psat::F)::Function where {F<:
             return C
         end
     end
+    return f
+end
+
+"""
+    condensibleprofile(G::VariableGas, Γ::AbstractAdiabat, ppartial)
+
+Create a new function determining the temperature dependent concentration of a condensible gas that has a uniform stratospheric concentration. Then use that function to [`reconcentrate`](@ref) a [`VariableGas`](@ref).
+"""
+function condensibleprofile(G::VariableGas, Γ::AbstractAdiabat, ppartial)::VariableGas
+    #construct the concentration function
+    C = condensibleprofile(Γ, ppartial)
+    #assign the gas a new concentration profile
+    reconcentrate(G, C)
+end
+
+export haircut!
+"""
+    haircut!(T, P, tsat)
+
+Put a temperature floor on a temperature profile using the saturation temperature function `tsat(P)`.
+"""
+function haircut!(T, P, tsat::F)::Nothing where {F}
+    @assert length(T) == length(P)
+    for i ∈ eachindex(T)
+        Tsat = tsat(P[i])
+        if Tsat > T[i]
+            T[i] = Tsat
+        end
+    end
+    nothing
+end
+
+export rayleighCO2
+function rayleighCO2(ν, Pₛ, g, θ)
+    #convert to wavelength in micrometers
+    λ = ν2λ(ν)*1e6
+    #formula 2.32 from
+    #  Hansen and Travis, Light Scattering in Planetary Atmospheres (1974)
+    τ₀ = 1.527*(1/λ^4)*(1 + 0.013*(1/λ^2))
+    #conversion from Venus conditions
+    τ₀ *= 8.7/(93*𝐀)
+    #final optical depth
+    τ = (Pₛ/g)*τ₀
+
+    γ = 0.75
+    μ = cos(θ)
+    β = 1 - exp(-τ/μ)
+    f = γ*τ
+    R⁻ = ((0.5 - γ*μ)*β + f)/(1 + f)
+    R⁺ = f/(1 + f)
+    R = 1 - (1 - R⁺)*(1 - R⁻)/((1 - R⁻))
 end

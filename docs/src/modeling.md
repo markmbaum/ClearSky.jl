@@ -5,7 +5,8 @@ opticaldepth
 transmittance
 outgoing
 topfluxes
-topimbalance
+bottomfluxes
 GroupedAbsorber
 AcceleratedAbsorber
+update!
 ```

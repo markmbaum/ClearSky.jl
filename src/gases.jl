@@ -17,15 +17,11 @@ Structure defining the temperature and pressure ranges over which absorption cro
 | `Pmax` | `Float64` | highest pressure value |
 | `nP` | `Int64` | number of pressure coordinates |
 
-# Constructors
+# Constructor
 
     AtmosphericDomain(Trange, nT, Prange, nP)
 
 Creates a domain with the given temperature/pressure ranges and numbers of points. `Trange` and `Prange` should be tuples of two values. `nT` and `nP` indicate the number of points to use.
-
-    AtmosphericDomain()
-
-For convenience, creates a domain with 12 temperature points in `[25, 550]` K and 24 pressure points in `[1,1e6]` Pa.
 """
 struct AtmosphericDomain
     #temperature samples for interpolator [K]
@@ -40,8 +36,8 @@ struct AtmosphericDomain
     nP::Int64
 end
 
-function AtmosphericDomain(Trange::Tuple{Real,Real}, nT::Int,
-                           Prange::Tuple{Real,Real}, nP::Int)
+function AtmosphericDomain(Trange::NTuple{2,Real}, nT::Int,
+                           Prange::NTuple{2,Real}, nP::Int)
     #check for negatives
     @assert all(Trange .> 0) "temperature range must be positive"
     @assert all(Prange .> 0) "pressure range must be positive"
@@ -58,48 +54,30 @@ function AtmosphericDomain(Trange::Tuple{Real,Real}, nT::Int,
     AtmosphericDomain(T, Trange[1], Trange[2], nT, P, Prange[1], Prange[2], nP)
 end
 
-function AtmosphericDomain()
-    Trange = (25, 550)
-    Prange = (1, 1e6)
-    nT = 12
-    nP = 24
-    AtmosphericDomain(Trange, nT, Prange, nP)
-end
-
 #-------------------------------------------------------------------------------
 #wrapper type for the BichebyshevInterpolators used for cross-sections
 
 export OpacityTable
 
-"""
-An `OpacityTable` is a simple object wrapping a [BichebyshevInterpolator](https://markmbaum.github.io/BasicInterpolators.jl/stable/chebyshev/). Inside, the interpolator stores a grid of `log` cross-section values along `log` pressure coordinates and temperature coordinates. An `OpacityTable` behaves like a function, recieving a temperature and pressure. When called, it retrieves a cross-section from the interpolator, undoes the `log`, and returns it. When constructing a gas object, each wavenumber is allocated a unique `OpacityTable` for fast and accurate cross-section evaluation at any temperature and pressure inside the `AtmosphericDomain`. Generally, `OpacityTable` objects should be used indirectly through gas objects.
-"""
 struct OpacityTable
     Φ::BichebyshevInterpolator
     empty::Bool
 end
 
-function OpacityTable(T::AbstractVector{<:Real},
-                      P::AbstractVector{<:Real},
-                      σ::AbstractArray{<:Real,2})
-    if all(σ .== 0)
-        #avoid evaluating log(0) and passing -Infs to the interp constructor
-        Φ = BichebyshevInterpolator(T, log.(P), fill(0.0, size(σ)))
-        empty = true
-    else
-        Φ = BichebyshevInterpolator(T, log.(P), log.(σ))
-        empty = false
-    end
+function OpacityTable(T::AbstractVector{Float64},
+                      P::AbstractVector{Float64},
+                      σ::AbstractArray{Float64,2})
+    empty = all(σ .== 0)
+    Φ = BichebyshevInterpolator(T, log.(P), empty ? σ : log.(σ))
     OpacityTable(Φ, empty)
 end
 
 #gets cross sections out of interpolators, un-logged, cm^2/molecule
 #also explicitly handles empty tables
 function (Π::OpacityTable)(T, P)::Float64
-    Π.empty && return 0.0
     lnP = log(P)
     lnσ = Π.Φ(T, lnP)
-    return exp(lnσ)
+    exp(lnσ)
 end
 
 #-------------------------------------------------------------------------------
@@ -200,7 +178,7 @@ meanmolarmass(sl::SpectralLines) = sum(sl.A .* sl.μ)/sum(sl.A)
 #-------------------------------
 
 """
-Gas type for well mixed atmospheric constituents. Must be constructed from a `.par` file or a [`SpectralLines`](@ref) object.
+Gas type for well-mixed, radiatively active, atmospheric constituents. Must be constructed from a `.par` file or a [`SpectralLines`](@ref) object.
 
 # Constructors
 
@@ -216,7 +194,7 @@ Gas type for well mixed atmospheric constituents. Must be constructed from a `.p
 
     WellMixedGas(par::String, C, ν, Ω, shape!=voigt!, Δνcut=25; kwargs...)
 
-Same arguments as the first constructor, but reads a `par` file directly into the gas object. Keyword arguments are passed through to [`readpar`](@ref).
+Same arguments as the first constructor but reads a `par` file directly into the gas object. Keyword arguments are passed through to [`readpar`](@ref).
 """
 struct WellMixedGas <: AbstractGas
     name::String
@@ -249,7 +227,7 @@ end
 #-------------------------------
 
 """
-Gas type for variable concentration atmospheric constituents. Must be constructed from a `.par` file or a [`SpectralLines`](@ref) object.
+Gas type for variable concentration, radiatively active, atmospheric constituents (like water vapor). Must be constructed from a `.par` file or a [`SpectralLines`](@ref) object.
 
 # Constructors
 
@@ -315,11 +293,11 @@ concentration(g::VariableGas, T, P)::Float64 = g.C(T,P)
 """
     reconcentrate(g::WellMixedGas, C)
 
-Create a copy of a [`WellMixedGas`](@ref) object with a different molar concentration, `C`, in mole/mole.
+Create a copy of a [`WellMixedGas`](@ref) object with a different molar concentration, `C` [mole/mole].
 
 !!! warning
 
-    Only reconcentrate gas objects with very low concentrations. The self-broadening component of the line shape is not recomputed when using the `reconcentrate` function. This component is very small when partial pressure is very low, but may be appreciable for bulk components.
+    Only reconcentrate gas objects with very low concentrations. The self-broadening component of the line shape is not recomputed when using the `reconcentrate` function. This component is generally small when the partial pressure is low, but may be appreciable for bulk components.
 """
 function reconcentrate(g::WellMixedGas, C::Real)::WellMixedGas
     @assert 0 <= C <= 1 "gas molar concentrations must be in [0,1], not $C"
@@ -328,12 +306,51 @@ function reconcentrate(g::WellMixedGas, C::Real)::WellMixedGas
     WellMixedGas(g.name[:], g.formula[:], g.μ, C, g.ν, Ω, Π)
 end
 
+"""
+    reconcentrate(g::VariableGas, C)
+
+Create a copy of a [`VariableGas`](@ref) object with a new molar concentration function, `C(T,P)` [mole/mole].
+
+!!! warning
+
+    The self-broadening component of the line shape is not recomputed when using the `reconcentrate` function. This component is generally small when partial pressure is low, but may be appreciable if the concentration changes significantly.
+"""
+function reconcentrate(g::VariableGas, C::F)::VariableGas where {F}
+    Ω = g.Ω
+    for P ∈ Ω.P
+        for T ∈ Ω.T
+            @assert 0 <= C(T,P) <= 1.0 "gas molar concentrations must be in [0,1], not $C @ T=$T P=$P"
+        end
+    end
+    Ω = deepcopy(g.Ω)
+    Π = deepcopy(g.Π)
+    VariableGas(g.name[:], g.formula[:], g.μ, C, g.ν, Ω, Π)
+end
+
 #-------------------------------------------------------------------------------
+export rawσ
 
-#single cross-section
-(g::AbstractGas)(i::Int, T, P)::Float64 = concentration(g, T, P)*g.Π[i](T,P)
+"""
+    rawσ(g::AbstractGas, i, T, P)
 
-#for full vectors of cross-sections with whatever gas
+Retrieve the absorption cross-section at wavenumber index `i`, temperature `T` [K], and pressure `P` [Pa], **without** the concentration scaling.
+"""
+rawσ(g::AbstractGas, i::Int, T, P)::Float64 = g.Π[i](T,P)
+
+"""
+    rawσ(g::AbstractGas, i, T, P)
+
+Retrieve the absorption cross-section for all wavenumbers at temperature `T` [K], and pressure `P` [Pa], **without** the concentration scaling.
+"""
+function rawσ(g::AbstractGas, T, P)::Vector{Float64}
+    [rawσ(g, i, T, P) for i ∈ eachindex(g.ν)]
+end
+
+#single concentration-scaled cross-section
+(g::AbstractGas)(i::Int, T, P)::Float64 = concentration(g, T, P)*rawσ(g, i, T, P)
+
+#for full vectors of concentration-scaled cross-sections with whatever gas
 function (g::AbstractGas)(T::Real, P::Real)::Vector{Float64}
     [g(i, T, P) for i ∈ eachindex(g.ν)]
 end
+

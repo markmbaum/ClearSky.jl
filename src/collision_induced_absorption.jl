@@ -94,7 +94,7 @@ function readcia(filename::String)
 end
 
 """
-Organizing type for collision induced absorption data, with data tables loaded into [interpolators](https://markmbaum.github.io/BasicInterpolators.jl/stable/).
+Organizing type for collision induced absorption data, with data tables loaded into [interpolators](https://markmbaum.github.io/BasicInterpolators.jl/dev/).
 
 | Field | Type | Description |
 | ----- | :--- | :---------- |
@@ -106,7 +106,7 @@ Organizing type for collision induced absorption data, with data tables loaded i
 | `extrapolate` | `Bool` | whether to extrapolate using flat boundaries from the coefficient grids in `Φ` |
 | `singles` | `Bool` | whether to use the single ranges in `ϕ` at all |
 
-The interpolator objects are described in the [`BasicInterpolators.jl`](https://markmbaum.github.io/BasicInterpolators.jl/stable/) documentation.
+The interpolator objects are described in the [`BasicInterpolators.jl`](https://markmbaum.github.io/BasicInterpolators.jl/dev/) documentation.
 
 # Constructors
 
@@ -148,8 +148,8 @@ struct CIATables
     #a Set object of the two gases involved
     formulae::Tuple{String,String}
     #interpolation structs
-    Φ::Vector{BilinearInterpolator{NoBoundaries}}
-    ϕ::Vector{LinearInterpolator{NoBoundaries}}
+    Φ::Vector{BilinearInterpolator{Float64,NoBoundaries}}
+    ϕ::Vector{LinearInterpolator{Float64,NoBoundaries}}
     #temperatures for singles in ϕ
     T::Vector{Float64}
     #whether to extrapolate (!)
@@ -173,8 +173,8 @@ function CIATables(data::Vector{Dict{String,Any}};
     νranges = sort(unique(zip(νmin, νmax)), by=x->x[1])
     n = length(νranges)
     #now get the interpolation tables and temperature ranges for each νrange
-    Φ = Vector{BilinearInterpolator}()
-    ϕ = Vector{LinearInterpolator}()
+    Φ = Vector{BilinearInterpolator{Float64,NoBoundaries}}()
+    ϕ = Vector{LinearInterpolator{Float64,NoBoundaries}}()
     τ = Vector{Float64}()
     for i = 1:n
         νmin[i], νmax[i] = νranges[i]
@@ -400,13 +400,13 @@ Container for a [`CIATables`](@ref) object and the two gasses representing the C
 
 # Constructors
 
-    CIA(x::CIATables, g₁::AbstractGas, g₂::AbstractGas)
+    CIA(ciatables::CIATables, g₁::AbstractGas, g₂::AbstractGas)
 
-The name and formulae are taken from `x`.
+The name and formulae are taken from `ciatables`.
 
-    CIA(x::CIATables, gases::AbstractGas...)
+    CIA(ciatables::CIATables, gases::Tuple)
 
-Using the formulae in `x`, the correct pair of gases is automatically selected from a VarArg collection of gases.
+Using the formulae in `ciatables`, the correct pair of gases is automatically selected from a VarArg collection of gases.
 
 # Example
 
@@ -437,8 +437,10 @@ struct CIA{T,U}
     g₂::U
 end
 
-function CIA(x::CIATables, g₁::AbstractGas, g₂::AbstractGas)
-    CIA(x.name, x.formulae, x, g₁, g₂)
+function CIA(ciatables::CIATables, g₁::AbstractGas, g₂::AbstractGas)
+    @assert g₁.formula in ciatables.formulae "gas $(g₁.formula) not found in $(ciatables.name) CIATables"
+    @assert g₂.formula in ciatables.formulae "gas $(g₂.formula) not found in $(ciatables.name) CIATables"
+    CIA(ciatables.name, ciatables.formulae, ciatables, g₁, g₂)
 end
 
 function findgas(f::String, cianame::String, gases::AbstractGas...)
@@ -448,13 +450,13 @@ function findgas(f::String, cianame::String, gases::AbstractGas...)
     return gases[idx[1]]
 end
 
-function CIA(x::CIATables, gases::AbstractGas...)
+function CIA(ciatables::CIATables, gases::Tuple)
     #gas formulae
-    f₁, f₂ = x.formulae
+    f₁, f₂ = ciatables.formulae
     #find matching gases
-    g₁, g₂ = findgas(f₁, x.name, gases...), findgas(f₂, x.name, gases...)
+    g₁, g₂ = findgas(f₁, ciatables.name, gases...), findgas(f₂, ciatables.name, gases...)
     #make a CIA object
-    CIA(x, g₁, g₂)
+    CIA(ciatables, g₁, g₂)
 end
 
-(X::CIA)(ν, T, P)::Float64 = cia(ν, X.x, T, P, X.g₁, X.g₂)
+(χ::CIA)(ν, T, P)::Float64 = cia(ν, χ.x, T, P, χ.g₁, χ.g₂)

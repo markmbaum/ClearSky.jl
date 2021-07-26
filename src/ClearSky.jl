@@ -2,9 +2,9 @@ module ClearSky
 
 using Base: tail
 using Base.Threads: @threads
-using QuadGK: gauss
-using Cubature
 using BasicInterpolators
+using Cubature: hquadrature
+using QuadGK: gauss
 using ScalarRadau
 
 #order matters

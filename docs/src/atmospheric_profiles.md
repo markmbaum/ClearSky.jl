@@ -31,4 +31,7 @@ altitude
 psatH2O
 tsatCO2
 ozonelayer
+condensibleprofile
+haircut!
+rayleighCO2
 ```

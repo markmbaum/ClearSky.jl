@@ -1,6 +1,6 @@
 # Gas Objects
 
-Gas objects are high-level representations of greenhouse gases that allow fast and continuous retrieval of absorption cross-sections over a range of temperatures and pressures.
+Gas objects are high-level representations of greenhouse gases that allow fast retrieval of absorption cross-sections over continuous ranges of temperature and pressure.
 
 ## Creating Gases
 
@@ -22,23 +22,23 @@ using ClearSky
 Ω = AtmosphericDomain((100,350), 12, (1,1e5), 24);
 ```
 
-defines 2500 evenly spaced wavenumber samples over the longwave window and an atmospheric domain between 100-350 K and 1-1e5 Pa. The numbers 12 and 24 define the number of interpolation nodes along the temperature and pressure axes, respectively.
+defines 2500 evenly spaced wavenumber samples over a typical window of longwave wavenumbers and an atmospheric domain between 100-350 K and 1-1e5 Pa. The numbers 12 and 24 define the number of interpolation nodes along the temperature and pressure axes, respectively.
 
 Now you can create a gas object directly from a `par` file containing the spectral line data from HITRAN. For example, to load carbon dioxide from the file `"CO2.par"` and assign a well-mixed concentration of 400 ppm,
 ```julia
 co2 = WellMixedGas("CO2.par", 400e-6, ν, Ω)
 ```
 In the background, `ClearSky` does the following
-1. reads line data
+1. reads the line data
 2. computes absorption cross-sections for each wavenumber, temperature, and pressure point defined by `ν` and `Ω` (using the [`voigt!`](@ref) profile by default)
 3. generates high-accuracy interpolation functions for the temperature-pressure grid at each wavenumber
 4. stores concentration information
 
-Consequently, loading gases will take some time. It will be faster with more threads and with fewer wavenumber, temperature, and pressure points.
+Consequently, loading gases may take some time. It will be faster with more threads and with fewer wavenumber, temperature, and pressure points.
 
 ## Retrieving Cross-Sections
 
-Gases are [function-like objects](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects). They can be used like functions to retrieve **concentration-scaled** cross-sections at any temperature and pressure within the atmospheric domain. For example, computing cross-sections at a specific temperature and pressure, 250 K and 10000 Pa for example, is as simple as
+Gases are [function-like objects](https://docs.julialang.org/en/v1/manual/methods/#Function-like-objects). They can be used like functions to retrieve **concentration-scaled** cross-sections at any temperature and pressure within the atmospheric domain. Computing cross-sections at a specific temperature and pressure, 250 K and 10000 Pa for example, is as simple as
 
 ```julia
 co2(250, 1e4)
@@ -51,6 +51,8 @@ If you only need a cross-section for one of the specific wavenumber points in th
 ```julia
 co2(600, 250, 1e4)
 ```
+
+To retrieve cross-sections that are not concentration-scaled, use the [`rawσ`](@ref) function.
 
 ## Storing Gases
 
@@ -67,9 +69,9 @@ co2 = deserialize("co2");
 
 ```@docs
 AtmosphericDomain
-OpacityTable
 WellMixedGas
 VariableGas
+rawσ
 concentration
 reconcentrate
 ```

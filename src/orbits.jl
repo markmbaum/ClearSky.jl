@@ -67,7 +67,7 @@ function eccentricanomaly(t, a, m, e)
     #definition of mean anomaly
     M = 2π*rem(t, T)/T
     #eccentric anomaly must be found numerically
-    E = falseposition((E,p)->meananomaly(E, e) - M, 0, 2π)
+    E = regulafalsi((E,p)->meananomaly(E, e) - M, 0, 2π)
     return E
 end
 

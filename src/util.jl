@@ -1,10 +1,5 @@
-export trapz, logrange, meshgrid, shellintegral
+export trapz, logrange, meshgrid, shellintegral, regulafalsi, secant
 
-"""
-    trapz(x, y)
-
-Integrate a sorted group of coordinates using the composite [trapezoidal rule](https://en.wikipedia.org/wiki/Trapezoidal_rule).
-"""
 function trapz(x::AbstractVector, y::AbstractVector)::Float64
     @assert length(x) == length(y) "vectors must be equal length"
     s = 0.0
@@ -24,50 +19,6 @@ function logrange(a, b, N::Int=101, γ::Real=1)::Vector{Float64}
     ((10 .^ LinRange(0, γ, N)) .- 1)*(b - a)/(10^γ - 1) .+ a
 end
 
-function interp(q::Float64,
-                x::AbstractVector{Float64},
-                y::AbstractVector{Float64})::Float64
-    #find the proper cell
-    i = findcell(q, x)
-    #interpolate
-    (q - x[i])*(y[i+1] - y[i])/(x[i+1] - x[i]) + y[i]
-end
-
-function falseposition(F::T,
-                       x₁::Real,
-                       x₂::Real,
-                       param=nothing;
-                       tol::Float64=1e-6)::Float64 where {T}
-    y₁ = F(x₁, param)
-    if y₁ == 0
-        return x₁
-    end
-    y₂ = F(x₂, param)
-    if y₂ == 0
-        return x₂
-    end
-    @assert sign(y₁) != sign(y₂) "false position non-bracketing"
-    yₘ = Inf
-    yₚ = NaN
-    n = 0
-    while abs(yₚ - yₘ) > (tol + tol*abs(yₘ)) || (n < 2)
-        #store previous evaluation
-        yₚ = yₘ
-        #approximate zero
-        xₘ = x₁ - y₁*(x₂ - x₁)/(y₂ - y₁)
-        yₘ = F(xₘ, param)
-        #reduce the interval
-        if y₁*yₘ > 0
-            x₁ = xₘ
-        else
-            x₂ = xₘ
-        end
-        #count
-        n += 1
-    end
-    return (x₁ + x₂)/2
-end
-
 # θ: latitude [-π/2,π/2]
 # ϕ: longitude [0,2π]
 # f(θ, ϕ)
@@ -76,7 +27,6 @@ function shellintegral(f::T,
                        param=nothing;
                        nθ::Int=360,
                        nϕ::Int=720)::Float64 where {T}
-
     I = 0.0
     Δθ = π/nθ
     Δϕ = 2π/nϕ
@@ -115,3 +65,71 @@ P2ω(Pₛ, Pₜ)::NTuple{2,Float64} = P2ω(Pₛ), P2ω(Pₜ)
 P2ι(P)::Float64 = log(P)
 ι2P(ι)::Float64 = exp(ι)
 P2ι(Pₜ, Pₛ)::NTuple{2,Float64} = P2ι(Pₜ), P2ι(Pₛ)
+
+#------------------------------------------------------------------------------
+# a couple of root finding methods
+
+terminate(a, b, tol)::Bool = abs(a - b) < (tol + tol*abs(b)) ? true : false
+
+function terminate(x₁, x₂, y₁, y₂, tol)::Bool
+    terminate(x₁, x₂, tol) && terminate(y₁, y₂, tol) && return true
+    return false
+end
+
+function regulafalsi(F, x₁, x₂, p=nothing; tol=1e-6)::Float64
+    @assert x₁ != x₂ "starting points must not be identical"
+    y₁ = F(x₁, p)
+    if y₁ == 0
+        return x₁
+    end
+    y₂ = F(x₂, p)
+    if y₂ == 0
+        return x₂
+    end
+    @assert sign(y₁) != sign(y₂) "regula falsi non-bracketing"
+    yₘ = Inf
+    yₚ = NaN
+    n = 0
+    while !terminate(x₁, x₂, yₚ, yₘ, tol) || (n < 2)
+        #store previous evaluation
+        yₚ = yₘ
+        #approximate zero
+        xₘ = x₁ - y₁*(x₂ - x₁)/(y₂ - y₁)
+        yₘ = F(xₘ, p)
+        #reduce the interval
+        if y₁*yₘ > 0
+            x₁ = xₘ
+        else
+            x₂ = xₘ
+        end
+        #count
+        n += 1
+    end
+    return (x₁ + x₂)/2
+end
+
+function secant(F, x₁, x₂, p=nothing; tol=1e-6)::Float64
+    @assert x₁ != x₂ "starting points must not be identical"
+    y₁ = F(x₁, p)
+    if y₁ == 0
+        return x₁
+    end
+    y₂ = F(x₂, p)
+    if y₂ == 0
+        return x₂
+    end
+    y₃ = Inf
+    x₃ = NaN
+    n = 0
+    while !terminate(x₁, x₂, y₁, y₂, tol) || (n < 2)
+        #approximate zero
+        x₃ = x₁ - y₁*(x₂ - x₁)/(y₂ - y₁)
+        y₃ = F(x₃, p)
+        #swap values
+        x₁, x₂ = x₂, x₃
+        y₁, y₂ = y₂, y₃
+        #count
+        n += 1
+    end
+    return x₃
+end

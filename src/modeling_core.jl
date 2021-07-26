@@ -9,11 +9,12 @@ function pressurelimits(gases)::NTuple{2,Float64}
     return Pmin, Pmax
 end
 
-function checkpressures(gases, pressures...)::Nothing
+function checkpressures(gases, Pₛ, Pₜ)::Nothing
+    @assert Pₛ > Pₜ "Pₛ must be greater than Pₜ"
     #pressure bounds
     Pmin, Pmax = pressurelimits(gases)
     #demand all pressures within the range
-    for P ∈ pressures
+    for P ∈ (Pₛ, Pₜ)
         @assert P >= Pmin "Pressure $P Pa too low, domain minimum is $Pmin"
         @assert P <= Pmax "Pressure $P Pa too low, domain minimum is $Pmax"
     end
@@ -91,22 +92,22 @@ function GroupedAbsorber(absorbers::Tuple)
         end
     end
     #all gases
-    G = absorbers[findall(t->t<:AbstractGas, T)]
+    gas = absorbers[findall(t->t<:AbstractGas, T)]
     #cia tables, pairing with the correct gases in the process
-    C = tuple([CIA(x, G...) for x ∈ absorbers[findall(t->t==CIATables, T)]]...)
+    cia = tuple([CIA(x, gas) for x ∈ absorbers[findall(t->t==CIATables, T)]]...)
     #functions in the form σ(ν, T, P)
-    F = absorbers[findall(t->!(t<:AbstractGas) & !(t==CIATables), T)]
+    fun = absorbers[findall(t->!(t<:AbstractGas) & !(t==CIATables), T)]
     #wavenumber vector, must be identical for all gases
-    ν = getwavenumbers(G...)
+    ν = getwavenumbers(gas...)
     nν = length(ν)
     #flag indicating whether there are only gases present, no cias orfunctions
-    gasonly = isempty(C) & isempty(F)
+    gasonly = isempty(cia) & isempty(fun)
     #flags indicating whether all gases are empty at each wavenumber
     gasempty = zeros(Bool, nν)
     for i ∈ eachindex(ν)
-        gasempty[i] = all(ntuple(j->G[j].Π[i].empty, length(G)))
+        gasempty[i] = all(ntuple(j->gas[j].Π[i].empty, length(gas)))
     end
-    return GroupedAbsorber(G, C, F, ν, nν, gasonly, gasempty)
+    return GroupedAbsorber(gas, cia, fun, ν, nν, gasonly, gasempty)
 end
 
 #https://discourse.julialang.org/t/tuple-indexing-taking-time/58309/18?u=markmbaum
@@ -115,27 +116,27 @@ function σrecur(A::Q, x, T, P)::Float64 where {Q}
     first(A)(x, T, P) + σrecur(tail(A), x, T, P)
 end
 
-function getσ(ga::GroupedAbsorber, i::Int, T, P)::Float64
-    ν = ga.ν[i]
-    σ = σrecur(ga.gas, i, T, P) + σrecur(ga.cia, ν, T, P) + σrecur(ga.fun, ν, T, P)
+function getσ(G::GroupedAbsorber, i::Int, T, P)::Float64
+    ν = G.ν[i]
+    σ = σrecur(G.gas, i, T, P) + σrecur(G.cia, ν, T, P) + σrecur(G.fun, ν, T, P)
     return σ
 end
 
-(ga::GroupedAbsorber)(i::Int, T, P)::Float64 = getσ(ga, i, T, P)
+(G::GroupedAbsorber)(i::Int, T, P)::Float64 = getσ(G, i, T, P)
 
-function (ga::GroupedAbsorber)(T::Real, P::Real)::Vector{Float64}
-    [ga(i, T, P) for i ∈ eachindex(ga.ν)]
+function (G::GroupedAbsorber)(T::Real, P::Real)::Vector{Float64}
+    [G(i, T, P) for i ∈ eachindex(G.ν)]
 end
 
 #check whether integration is pointless because there's no absorption
-noabsorption(ga::GroupedAbsorber, i::Int)::Bool = ga.gasonly && ga.gasempty[i]
+noabsorption(G::GroupedAbsorber, i::Int)::Bool = G.gasonly && G.gasempty[i]
 
-function noabsorption(ga::GroupedAbsorber)::Vector{Bool}
-    [noabsorption(ga, i) for i ∈ eachindex(ga.ν)]
+function noabsorption(G::GroupedAbsorber)::Vector{Bool}
+    [noabsorption(G, i) for i ∈ eachindex(G.ν)]
 end
 
-function checkpressures(ga::GroupedAbsorber, pressures...)
-    checkpressures(ga.gas, pressures...)
+function checkpressures(G::GroupedAbsorber, Pₛ, Pₜ)
+    checkpressures(G.gas, Pₛ, Pₜ)
 end
 
 #-------------------------------------------------------------------------------
@@ -144,7 +145,8 @@ end
 export AcceleratedAbsorber, update!
 
 """
-    AcceleratedAbsorber(ga, P, T)
+    AcceleratedAbsorber(P, T, G::GroupedAbsorber)
+    AcceleratedAbsorber(P, T, absorbers...)
 
 An accelerated struct for getting cross-sections from groups of absorbers. Pressure and temperature coordinates must be provided. 
 """
@@ -160,53 +162,73 @@ struct AcceleratedAbsorber <: UnifiedAbsorber
     #original pressures
     P::Vector{Float64}
     #reference to GroupedAbsorber
-    ga::GroupedAbsorber
+    G::GroupedAbsorber
 end
 
-function AcceleratedAbsorber(ga::GroupedAbsorber, P::Vector{Float64}, T::Vector{Float64})
-    ν, nν = ga.ν, ga.nν
+function AcceleratedAbsorber(P::Vector{Float64},T::Vector{Float64}, G::GroupedAbsorber)
+    ν, nν = G.ν, G.nν
     logP = log.(P)
     ϕ = Vector{LinearInterpolator{Float64,WeakBoundaries}}(undef, nν)
     empty = zeros(Bool, nν)
     @threads for i ∈ eachindex(ν)
-        empty[i] = noabsorption(ga, i)
+        empty[i] = noabsorption(G, i)
         if !empty[i]
-            σ = ga.(i, T, P)
+            σ = G.(i, T, P)
             σ[σ .< 1e-200] .= 1e-200
             ϕ[i] = LinearInterpolator(logP, log.(σ), WeakBoundaries())
         end
     end
-    AcceleratedAbsorber(ϕ, ν, nν, empty, P, ga)
+    AcceleratedAbsorber(ϕ, ν, nν, empty, P, G)
+end
+
+function AcceleratedAbsorber(P::Vector{Float64}, T::Vector{Float64}, absorbers...)
+    AcceleratedAbsorber(P, T, GroupedAbsorber(absorbers))
 end
 
 #also a method specifically for interpolators, P vs log(σ)
-getσ(aa::AcceleratedAbsorber, i, _, P)::Float64 = exp(aa.ϕ[i](log(P)))
+getσ(A::AcceleratedAbsorber, i, _, P)::Float64 = exp(A.ϕ[i](log(P)))
 
-(aa::AcceleratedAbsorber)(i::Int, P)::Float64 = getσ(aa, i, nothing, P)
+(A::AcceleratedAbsorber)(i::Int, P)::Float64 = getσ(A, i, nothing, P)
 
-function (aa::AcceleratedAbsorber)(P::Real)::Vector{Float64}
-    [aa(i, P) for i ∈ eachindex(aa.ν)]
+function (A::AcceleratedAbsorber)(P::Real)::Vector{Float64}
+    [A(i, P) for i ∈ eachindex(A.ν)]
 end
 
-noabsorption(aa::AcceleratedAbsorber, i::Int)::Bool = aa.empty[i]
+noabsorption(A::AcceleratedAbsorber, i::Int)::Bool = A.empty[i]
 
-function noabsorption(ga::AcceleratedAbsorber)::Vector{Bool}
-    [noabsorption(aa, i) for i ∈ eachindex(ga.ν)]
+function noabsorption(G::AcceleratedAbsorber)::Vector{Bool}
+    [noabsorption(A, i) for i ∈ eachindex(G.ν)]
 end
 
-function checkpressures(aa::AcceleratedAbsorber, pressures...)
-    checkpressures(aa.ga.gas, pressures...)
+function checkpressures(A::AcceleratedAbsorber, Pₛ, Pₜ)
+    checkpressures(A.G.gas, Pₛ, Pₜ)
 end
 
-function update!(aa::AcceleratedAbsorber, T::Vector{Float64})
-    @assert length(T) == length(aa.P)
-    @threads for i ∈ eachindex(aa.ϕ)
-        if !aa.empty[i]
-            for j ∈ eachindex(aa.P)
-                aa.ϕ[i].r.y[j] = max(log(aa.ga(i, T[j], aa.P[j])), 1e-200)
+"""
+    update!(A::AcceleratedAbsorber, T::Vector{Float64})
+
+Update the cross-section interpolators underlyig an `AcceleratedAbsorber` with a new set of temperatures. The new temperatures should correspond to the pressure levels used when originally constructing the `AcceleratedAbsorber`.  
+"""
+function update!(A::AcceleratedAbsorber, T::Vector{Float64})
+    @assert length(T) == length(A.P)
+    @threads for i ∈ eachindex(A.ϕ)
+        if !A.empty[i]
+            for j ∈ eachindex(A.P)
+                A.ϕ[i].r.y[j] = max(log(A.G(i, T[j], A.P[j])), 1e-200)
             end
         end
     end
+end
+
+#-------------------------------------------------------------------------------
+#making sense of variable absorber inputs
+
+function unifyabsorbers(absorbers::Tuple)::UnifiedAbsorber
+    length(absorbers) == 0 && error("no absorbers")
+    if (length(absorbers) == 1) && (typeof(absorbers[1]) <: UnifiedAbsorber)
+        return absorbers[1]
+    end
+    GroupedAbsorber(absorbers)
 end
 
 #-------------------------------------------------------------------------------
@@ -214,44 +236,38 @@ end
 
 const NODECACHE = Dict{Int64,NTuple{2,Vector{Float64}}}()
 
-function streamnodes(n::Int)::NTuple{2,Vector{Float64}}
-    #pedantic with the key type
-    n = convert(Int64, n)
-    #getting the gauss nodes is fast but not trivial
+function _streamnodes(n::Int64)::NTuple{2,Vector{Float64}}
+    #gauss-legendre quadrature points and weights in [-1,1]
+    x, w = gauss(n)
+    #map angles and weights to θ ∈ [0,π/2]
+    θ = @. (π/2)*(x + 1)/2
+    w .*= (π/2)/2
+    #sines and cosines of θ
+    c = cos.(θ)
+    s = sin.(θ)
+    #precompute 2π*cos(θ)*sin(θ)*wzxc
+    W = @. 2π*w*c*s
+    #precompute 1/cos(θ) using "m" because μ is for gas molar masses
+    m = 1 ./ c
+    return m, W
+end
+
+function streamnodes(n::Int64)::NTuple{2,Vector{Float64}}
+    #too few streams is likely problematic
+    if n < 4
+        @warn "careful! using nstream < 4 is likely to be inaccurate!" maxlog=1
+    end
+    #getting the gauss nodes is pretty fast but not trivial
     if !haskey(NODECACHE, n)
-        if n < 4
-            @warn "careful! using nstream < 4 is likely to be inaccurate!" maxlog=1
-        end
-        #gauss-legendre quadrature points and weights in [-1,1]
-        x, w = gauss(n)
-        #map angles and weights to θ ∈ [0,π/2]
-        θ = @. (π/2)*(x + 1)/2
-        w .*= (π/2)/2
-        #sines and cosines of θ
-        c = cos.(θ)
-        s = sin.(θ)
-        #precompute 2π*cos(θ)*sin(θ)*wzxc
-        W = @. 2π*w*c*s
-        #precompute 1/cos(θ) using "m" because μ is for gas molar masses
-        m = 1 ./ c
         #store these values
-        NODECACHE[n] = (m, W)
+        NODECACHE[n] = _streamnodes(n)
     end
     return NODECACHE[n]
 end
 
-#-------------------------------------------------------------------------------
-# functions for setting up absorbers, coordinates, etc. for integration
-
-#operations common to setting up high-level radiative functions
-function setupintegration(Pₛ, Pₜ, absorbers)
-    #split gas objects from cia objects
-    ga = GroupedAbsorber(absorbers)
-    #check pressures in order
-    @assert Pₛ > Pₜ "Pₛ must be greater than Pₜ"
-    #check pressures against AtmosphericDomains
-    checkpressures(ga.gas, Pₛ, Pₜ)
-    return ga
+#load some stream nodes in serial
+for n ∈ 1:16
+    NODECACHE[n] = _streamnodes(n)
 end
 
 #-------------------------------------------------------------------------------
@@ -429,10 +445,8 @@ function streams!(dIdx::Q, #version of schwarzschild equation
         stream!(dIdx, I₀, I, x, x₁, x₂, A, idx, g, m[i], fT, fμ, tol)
         # integral over hemisphere: ∫∫ I cos(θ) sin(θ) dθ dϕ, where θ∈[0,π/2], ϕ∈[0,2π]
         for j ∈ eachindex(F)
-            F[j] += W[i]*I[j] #W = 2π*w*cos(θ)*sin(θ), precomputed
+            @inbounds F[j] += W[i]*I[j] #W = 2π*w*cos(θ)*sin(θ), precomputed
         end
     end
     return nothing
 end
-
-
