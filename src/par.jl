@@ -59,7 +59,7 @@ function readpar(filename::String;
                  Scut::Real=0,
                  I::Vector=[],
                  maxlines::Int=-1)
-    #@assert filename[end-3:end] == ".par" "expected file with .par extension, downloaded from https://hitran.org/lbl/"
+    @assert filename[end-3:end] == ".par" "expected file with .par extension, downloaded from https://hitran.org/lbl/"
     lines = readlines(filename)
     N = length(lines)
     #hard code the format to make sure nothing slows it down ¯\_(ツ)_/¯
