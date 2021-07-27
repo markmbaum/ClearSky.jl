@@ -13,6 +13,7 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
 Cubature = "1"
+QuadGK = "2"
 julia = "1.5"
 
 [extras]
