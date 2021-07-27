@@ -22,19 +22,21 @@ P = reverse(logrange(1e5, 1, 250))
 T = Γ.(P)
 A = AcceleratedAbsorber(P, T, co2, ch4, h2o, co2co2, co2ch4, (ν,T,P)->1e-30)
 
+issane(x) = all(@. !isnan(x)) & all(@. !isinf(x))
+
 τ = opticaldepth(Pₛ, Pₜ, g, Γ, fμ, θ, A)
-@test trapz(ν, τ) ≈ 65001.19194742341
+@test issane(τ)
 
 t = transmittance(Pₛ, Pₜ, g, Γ, fμ, θ, A)
-@test trapz(ν, t) ≈ 74670.50132922476
+@test issane(t)
 
 olr = outgoing(Pₛ, g, Γ, fμ, A)
-@test trapz(ν, olr) ≈ 336.96022895994196
+@test issane(olr)
 
 Fₜ⁻, Fₜ⁺ = topfluxes(Pₛ, g, Γ, fμ, fstellar, falbedo, A)
-@test trapz(ν, Fₜ⁻) ≈ 283.5281957875912
-@test trapz(ν, Fₜ⁺) ≈ 393.3404384262924
+@test issane(Fₜ⁻)
+@test issane(Fₜ⁺)
 
 Fₛ⁻, Fₛ⁺ = bottomfluxes(Pₛ, g, Γ, fμ, fstellar, falbedo, A)
-@test trapz(ν, Fₛ⁻) ≈ 315.6348654709627
-@test trapz(ν, Fₛ⁺) ≈ 405.0246045370683
+@test issane(Fₛ⁻)
+@test issane(Fₛ⁺)
