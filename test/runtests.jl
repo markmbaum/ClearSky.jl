@@ -1,5 +1,3 @@
-pushfirst!(LOAD_PATH, "C:/Users/markm/Documents/code")
-
 using ClearSky
 using Test
 using SpecialFunctions
