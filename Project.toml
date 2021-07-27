@@ -12,6 +12,7 @@ ScalarRadau = "52145ff8-3717-48bc-b8ab-44d3704098ee"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
+ScalarRadau = "1"
 julia = "1.5"
 
 [extras]
