@@ -13,6 +13,7 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
 SpecialFunctions = "1"
+BasicInterpolators = "0.3"
 ScalarRadau = "1"
 Cubature = "1"
 QuadGK = "2"
