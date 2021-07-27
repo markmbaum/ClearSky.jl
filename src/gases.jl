@@ -75,6 +75,7 @@ end
 #gets cross sections out of interpolators, un-logged, cm^2/molecule
 #also explicitly handles empty tables
 function (Π::OpacityTable)(T, P)::Float64
+    Π.empty && return 0.0
     lnP = log(P)
     lnσ = Π.Φ(T, lnP)
     exp(lnσ)

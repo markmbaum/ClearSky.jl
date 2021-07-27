@@ -37,7 +37,7 @@ Read a collision induced absorption data file. These files are available from [H
 | `reference` | `Int64` | indices of data references |
 """
 function readcia(filename::String)
-    @assert filename[end-3:end] == ".cia" "expected file with .cia extension downloaded from https://hitran.org/cia/"
+    #@assert filename[end-3:end] == ".cia" "expected file with .cia extension downloaded from https://hitran.org/cia/"
     lines = readlines(filename)
     #lengths of all lines
     L = length.(lines)

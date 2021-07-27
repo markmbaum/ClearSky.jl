@@ -29,7 +29,7 @@ function opticaldepth(P₁::Real,
                       )::Vector{Float64} where {Q,R}
     #initialization
     P₁, P₂ = max(P₁, P₂), min(P₁, P₂)
-    A = parseabsorbers(absorbers)
+    A = unifyabsorbers(absorbers)
     checkpressures(A, P₁, P₂)
     checkazimuth(θ)
     #integrate wavenumbers in parallel
@@ -86,7 +86,7 @@ function outgoing(Pₛ::Real,
                   tol::Float64=1e-5 #integrator tolerance
                   )::Vector{Float64} where {Q,R}
     #initialization
-    A = parseabsorbers(absorbers)
+    A = unifyabsorbers(absorbers)
     checkpressures(A, Pₛ, Pₜ)
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
     #surface temperature
@@ -115,7 +115,7 @@ function topfluxes(Pₛ::Real,
                    θ::Float64=0.841, #corresponds to cos(θ) = 2/3
                    tol::Float64=1e-5)::NTuple{2,Vector{Float64}} where {Q,R,S,U}
     #setup
-    A = parseabsorbers(absorbers)
+    A = unifyabsorbers(absorbers)
     checkpressures(A, Pₛ, Pₜ)
     checkazimuth(θ)
     ν, nν = A.ν, A.nν
@@ -156,7 +156,7 @@ function bottomfluxes(Pₛ::Real,
                       θ::Float64=0.841, #corresponds to cos(θ) = 2/3
                       tol::Float64=1e-5)::NTuple{2,Vector{Float64}} where {Q,R,S,U}
     #setup
-    A = parseabsorbers(absorbers)
+    A = unifyabsorbers(absorbers)
     checkpressures(A, Pₛ, Pₜ)
     checkazimuth(θ)
     ν, nν = A.ν, A.nν
