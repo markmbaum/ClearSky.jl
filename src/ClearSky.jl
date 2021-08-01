@@ -1,7 +1,7 @@
 module ClearSky
 
 using Base: tail
-using Base.Threads: @threads
+using Base.Threads: @threads, nthreads, threadid
 using BasicInterpolators
 using Cubature: hquadrature
 using QuadGK: gauss

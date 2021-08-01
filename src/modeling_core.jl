@@ -166,7 +166,13 @@ struct AcceleratedAbsorber <: UnifiedAbsorber
 end
 
 function AcceleratedAbsorber(P::Vector{Float64},T::Vector{Float64}, G::GroupedAbsorber)
+    #pull out wavenumber info
     ν, nν = G.ν, G.nν
+    #flip pressures if they're not ascending (for interpolators)
+    if P[1] > P[end]
+        P = reverse(P)
+    end
+    #log pressure coordinates as usual
     logP = log.(P)
     ϕ = Vector{LinearInterpolator{Float64,WeakBoundaries}}(undef, nν)
     empty = zeros(Bool, nν)
@@ -174,7 +180,7 @@ function AcceleratedAbsorber(P::Vector{Float64},T::Vector{Float64}, G::GroupedAb
         empty[i] = noabsorption(G, i)
         if !empty[i]
             σ = G.(i, T, P)
-            σ[σ .< 1e-200] .= 1e-200
+            #σ[σ .< 1e-200] .= 1e-200
             ϕ[i] = LinearInterpolator(logP, log.(σ), WeakBoundaries())
         end
     end
@@ -186,7 +192,10 @@ function AcceleratedAbsorber(P::Vector{Float64}, T::Vector{Float64}, absorbers..
 end
 
 #also a method specifically for interpolators, P vs log(σ)
-getσ(A::AcceleratedAbsorber, i, _, P)::Float64 = exp(A.ϕ[i](log(P)))
+function getσ(A::AcceleratedAbsorber, i, _, P)::Float64
+    A.empty[i] && return 0.0
+    exp(A.ϕ[i](log(P)))
+end
 
 (A::AcceleratedAbsorber)(i::Int, P)::Float64 = getσ(A, i, nothing, P)
 
@@ -234,9 +243,9 @@ end
 #-------------------------------------------------------------------------------
 #function and cache for gaussian quadrature of multiple streams over the azimuth
 
-const NODECACHE = Dict{Int64,NTuple{2,Vector{Float64}}}()
+const NODECACHE = Dict{Int64,NTuple{2,Tuple}}()
 
-function _streamnodes(n::Int64)::NTuple{2,Vector{Float64}}
+function _streamnodes(n::Int64)::NTuple{2,Tuple}
     #gauss-legendre quadrature points and weights in [-1,1]
     x, w = gauss(n)
     #map angles and weights to θ ∈ [0,π/2]
@@ -249,10 +258,10 @@ function _streamnodes(n::Int64)::NTuple{2,Vector{Float64}}
     W = @. 2π*w*c*s
     #precompute 1/cos(θ) using "m" because μ is for gas molar masses
     m = 1 ./ c
-    return m, W
+    return tuple(m...), tuple(W...)
 end
 
-function streamnodes(n::Int64)::NTuple{2,Vector{Float64}}
+function streamnodes(n::Int64)::NTuple{2,Tuple}
     #too few streams is likely problematic
     if n < 4
         @warn "careful! using nstream < 4 is likely to be inaccurate!" maxlog=1
@@ -439,7 +448,7 @@ function streams!(dIdx::Q, #version of schwarzschild equation
     #setup gaussian quadrature nodes
     m, W = streamnodes(nstream)
     #wipe any pre-existing values
-    F .= 0.0
+    #F .= 0.0
     #solve schwarzschild w multiple streams, integrating over hemisphere
     for i ∈ 1:nstream
         stream!(dIdx, I₀, I, x, x₁, x₂, A, idx, g, m[i], fT, fμ, tol)
