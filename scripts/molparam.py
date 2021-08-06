@@ -26,9 +26,9 @@ isocols = ['gid', 'idx', 'isoform', 'AFGL', 'abundance', 'μ', 'Qref', 'fnQ', 'g
 Tmin = 25.0
 Tmax = 1000.0
 #maximum allowable relative error in interpolating function
-maxrelerr = 1e-2
+maxrelerr = 5e-3
 #output file
-fnout = join('..', 'src', 'Molparam.jl')
+fnout = join('..', 'src', 'molparam.jl')
 #log file for info on fitting
 fnlog = 'molparam.log'
 #TIPS data that must be ignored, specified by the q file name in isourl page
@@ -210,9 +210,13 @@ print('The largest relative error anywhere is %g' % max(df['maxrelerr'].max() fo
 
 #write to Julia!
 with open(fnout, 'wb') as f:
+
+    #write interpolation boundaries as constants
     write(f, 'const TMIN = %f\n' % Tmin)
     write(f, 'const TMAX = %f\n' % Tmax)
-    write(f, 'const MOLPARAM = [\n')
+
+    #write molparam structs
+    write(f, 'const MOLPARAM = MolParam[\n')
     for i in range(1, dfm['num'].max() + 1):
         #the molecule number must be present
         if i in dfm['num'].values:
@@ -221,8 +225,9 @@ with open(fnout, 'wb') as f:
             #get the proper isotopologue table
             df = dfi[idx]
             #write all the info
-            write(f, '  #1, molecule number\n')
-            write(f, '  [%d,\n' % i)
+            write(f, '  MolParam(\n')
+            write(f, '    #1, molecule number\n')
+            write(f, '    %d,\n' % i)
             write(f, '    #2, molecule formula\n')
             write(f, '    "%s",\n' % dfm.at[idx,'formula'])
             write(f, '    #3, molecule name\n')
@@ -235,7 +240,7 @@ with open(fnout, 'wb') as f:
             write(f, '    Int64[%s],\n' % strarray(df['AFGL']))
             write(f, '    #7, abundance fractions\n')
             write(f, '    Float64[%s],\n' % strarray(df['abundance']))
-            write(f, '    #8, molecular masses (kg/mole)\n')
+            write(f, '    #8, molecular masses [kg/mole]\n')
             write(f, '    Float64[%s],\n' % strarray(df['μ']/1e3))
             write(f, '    #9, Qref\n')
             write(f, '    Float64[%s],\n' % strarray(df['Qref']))
@@ -256,14 +261,14 @@ with open(fnout, 'wb') as f:
                     write(f, '\n    ]\n')
                 else:
                     write(f, ',\n')
-            #close the inner array
+            #close the struct definition
             if i == dfm['num'].max():
-                write(f, '  ]\n')
+                write(f, '  )\n')
             else:
-                write(f, '  ],\n')
+                write(f, '  ),\n')
         else:
             #no molecule with that number
-            write(f, '  [%d], #no molecule has been assigned this number\n' % i)
+            write(f, '  MolParam(), #no molecule has been assigned the number %d\n' % i)
     #close the outer array
     write(f, ']')
 print('file written: %s\n' % fnout)

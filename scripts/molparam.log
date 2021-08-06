@@ -1,5 +1,5 @@
 molparam.py log
-2021-04-09 14:43:16.671359
+2021-08-05 15:47:47.775775
 
 molecule 1: H2O
     isotopologue: H216O
@@ -12,123 +12,123 @@ molecule 1: H2O
         max relative err: 0.00286974
         polynomial terms: 7
     isotopologue: HD16O
-        max relative err: 0.00941988
-        polynomial terms: 8
+        max relative err: 0.00373935
+        polynomial terms: 10
     isotopologue: HD18O
-        max relative err: 0.00937831
-        polynomial terms: 8
+        max relative err: 0.00370778
+        polynomial terms: 10
     isotopologue: HD17O
-        max relative err: 0.00957086
-        polynomial terms: 8
+        max relative err: 0.0036889
+        polynomial terms: 10
     isotopologue: D216O
-        max relative err: 0.00913853
-        polynomial terms: 8
+        max relative err: 0.00388073
+        polynomial terms: 10
 
 molecule 2: CO2
     isotopologue: 12C16O2
-        max relative err: 0.00831427
-        polynomial terms: 7
+        max relative err: 0.00342845
+        polynomial terms: 8
     isotopologue: 13C16O2
-        max relative err: 0.00970226
-        polynomial terms: 6
+        max relative err: 0.00387478
+        polynomial terms: 8
     isotopologue: 16O12C18O
-        max relative err: 0.00840988
-        polynomial terms: 7
+        max relative err: 0.00349889
+        polynomial terms: 8
     isotopologue: 16O12C17O
-        max relative err: 0.00836314
-        polynomial terms: 7
+        max relative err: 0.00346648
+        polynomial terms: 8
     isotopologue: 16O13C18O
-        max relative err: 0.00971958
-        polynomial terms: 6
+        max relative err: 0.00394954
+        polynomial terms: 8
     isotopologue: 16O13C17O
-        max relative err: 0.00970703
-        polynomial terms: 6
+        max relative err: 0.00391417
+        polynomial terms: 8
     isotopologue: 12C18O2
-        max relative err: 0.00852045
-        polynomial terms: 7
+        max relative err: 0.00357666
+        polynomial terms: 8
     isotopologue: 17O12C18O
-        max relative err: 0.00846597
-        polynomial terms: 7
+        max relative err: 0.00353954
+        polynomial terms: 8
     isotopologue: 12C17O2
-        max relative err: 0.00841617
-        polynomial terms: 7
+        max relative err: 0.00350411
+        polynomial terms: 8
     isotopologue: 13C18O2
-        max relative err: 0.00973806
-        polynomial terms: 6
+        max relative err: 0.00403137
+        polynomial terms: 8
     isotopologue: 18O13C17O
-        max relative err: 0.00972679
-        polynomial terms: 6
+        max relative err: 0.00399235
+        polynomial terms: 8
     isotopologue: 13C17O2
-        max relative err: 0.00971737
-        polynomial terms: 6
+        max relative err: 0.00395492
+        polynomial terms: 8
 
 molecule 3: O3
     isotopologue: 16O3
-        max relative err: 0.00807232
-        polynomial terms: 8
+        max relative err: 0.00291787
+        polynomial terms: 9
     isotopologue: 16O16O18O
-        max relative err: 0.00846093
-        polynomial terms: 8
+        max relative err: 0.00295594
+        polynomial terms: 9
     isotopologue: 16O18O16O
-        max relative err: 0.00818386
-        polynomial terms: 8
+        max relative err: 0.00270732
+        polynomial terms: 9
     isotopologue: 16O16O17O
-        max relative err: 0.00828633
-        polynomial terms: 8
+        max relative err: 0.00292446
+        polynomial terms: 9
     isotopologue: 16O17O16O
-        max relative err: 0.00810803
-        polynomial terms: 8
+        max relative err: 0.00280155
+        polynomial terms: 9
 
 molecule 4: N2O
     isotopologue: 14N216O
-        max relative err: 0.00696758
-        polynomial terms: 6
+        max relative err: 0.00228976
+        polynomial terms: 9
     isotopologue: 14N15N16O
-        max relative err: 0.00596545
-        polynomial terms: 6
+        max relative err: 0.00251142
+        polynomial terms: 9
     isotopologue: 15N14N16O
-        max relative err: 0.00672815
-        polynomial terms: 6
+        max relative err: 0.00235156
+        polynomial terms: 9
     isotopologue: 14N218O
-        max relative err: 0.00686315
-        polynomial terms: 6
+        max relative err: 0.00234439
+        polynomial terms: 9
     isotopologue: 14N217O
-        max relative err: 0.00687119
-        polynomial terms: 6
+        max relative err: 0.00232352
+        polynomial terms: 9
 
 molecule 5: CO
     isotopologue: 12C16O
-        max relative err: 0.00655418
-        polynomial terms: 4
+        max relative err: 0.00158843
+        polynomial terms: 5
     isotopologue: 13C16O
-        max relative err: 0.00663601
-        polynomial terms: 4
+        max relative err: 0.00180116
+        polynomial terms: 5
     isotopologue: 12C18O
-        max relative err: 0.0066415
-        polynomial terms: 4
+        max relative err: 0.00181961
+        polynomial terms: 5
     isotopologue: 12C17O
-        max relative err: 0.00660377
-        polynomial terms: 4
+        max relative err: 0.00170775
+        polynomial terms: 5
     isotopologue: 13C18O
-        max relative err: 0.00669643
-        polynomial terms: 4
+        max relative err: 0.00205807
+        polynomial terms: 5
     isotopologue: 13C17O
-        max relative err: 0.00667212
-        polynomial terms: 4
+        max relative err: 0.00193378
+        polynomial terms: 5
 
 molecule 6: CH4
     isotopologue: 12CH4
-        max relative err: 0.00730773
-        polynomial terms: 11
+        max relative err: 0.00433532
+        polynomial terms: 12
     isotopologue: 13CH4
-        max relative err: 0.00730324
-        polynomial terms: 11
+        max relative err: 0.00430387
+        polynomial terms: 12
     isotopologue: 12CH3D
-        max relative err: 0.00689287
-        polynomial terms: 8
+        max relative err: 0.00366465
+        polynomial terms: 11
     isotopologue: 13CH3D
-        max relative err: 0.00689535
-        polynomial terms: 8
+        max relative err: 0.00364057
+        polynomial terms: 11
 
 molecule 7: O2
     isotopologue: 16O2
@@ -143,138 +143,142 @@ molecule 7: O2
 
 molecule 8: NO
     isotopologue: 14N16O
-        max relative err: 0.00830959
-        polynomial terms: 10
+        max relative err: 0.0047231
+        polynomial terms: 11
     isotopologue: 15N16O
-        max relative err: 0.00840763
-        polynomial terms: 10
+        max relative err: 0.00482521
+        polynomial terms: 11
     isotopologue: 14N18O
-        max relative err: 0.008474
-        polynomial terms: 10
+        max relative err: 0.00488644
+        polynomial terms: 11
 
 molecule 9: SO2
     isotopologue: 32S16O2
-        max relative err: 0.00798885
-        polynomial terms: 9
+        max relative err: 0.0033847
+        polynomial terms: 10
     isotopologue: 34S16O2
-        max relative err: 0.00800686
-        polynomial terms: 9
+        max relative err: 0.00340306
+        polynomial terms: 10
+    isotopologue: 33S16O2
+        no Q data, copied fit from 32S16O2
+    isotopologue: 16O32S18O
+        no Q data, copied fit from 32S16O2
 
 molecule 10: NO2
     isotopologue: 14N16O2
-        max relative err: 0.00979707
-        polynomial terms: 8
+        max relative err: 0.0045488
+        polynomial terms: 9
     isotopologue: 15N16O2
         no Q data, copied fit from 14N16O2
 
 molecule 11: NH3
     isotopologue: 14NH3
-        max relative err: 0.00752808
-        polynomial terms: 9
+        max relative err: 0.00483589
+        polynomial terms: 10
     isotopologue: 15NH3
-        max relative err: 0.00753576
-        polynomial terms: 9
+        max relative err: 0.00487045
+        polynomial terms: 10
 
 molecule 12: HNO3
     isotopologue: H14N16O3
-        max relative err: 0.00718142
-        polynomial terms: 9
+        max relative err: 0.00119388
+        polynomial terms: 10
     isotopologue: H15N16O3
-        max relative err: 0.00725592
-        polynomial terms: 9
+        max relative err: 0.00113317
+        polynomial terms: 10
 
 molecule 13: OH
     isotopologue: 16OH
-        max relative err: 0.00676713
-        polynomial terms: 9
+        max relative err: 0.00398358
+        polynomial terms: 10
     isotopologue: 18OH
-        max relative err: 0.00694907
-        polynomial terms: 9
+        max relative err: 0.00404121
+        polynomial terms: 10
     isotopologue: 16OD
-        max relative err: 0.00643776
-        polynomial terms: 8
+        max relative err: 0.00346756
+        polynomial terms: 9
 
 molecule 14: HF
     isotopologue: H19F
-        max relative err: 0.00993244
-        polynomial terms: 8
+        max relative err: 0.00440394
+        polynomial terms: 11
     isotopologue: D19F
-        max relative err: 0.00715168
-        polynomial terms: 3
+        max relative err: 0.00423634
+        polynomial terms: 5
 
 molecule 15: HCl
     isotopologue: H35Cl
-        max relative err: 0.0076179
-        polynomial terms: 3
+        max relative err: 0.00388205
+        polynomial terms: 5
     isotopologue: H37Cl
-        max relative err: 0.00765228
-        polynomial terms: 3
+        max relative err: 0.00386975
+        polynomial terms: 5
     isotopologue: D35Cl
-        max relative err: 0.0075462
-        polynomial terms: 4
+        max relative err: 0.00257506
+        polynomial terms: 5
     isotopologue: D37Cl
-        max relative err: 0.00754447
-        polynomial terms: 4
+        max relative err: 0.0025845
+        polynomial terms: 5
 
 molecule 16: HBr
     isotopologue: H79Br
-        max relative err: 0.00754665
-        polynomial terms: 4
+        max relative err: 0.00266669
+        polynomial terms: 5
     isotopologue: H81Br
-        max relative err: 0.0075465
-        polynomial terms: 4
+        max relative err: 0.00266601
+        polynomial terms: 5
     isotopologue: D79Br
-        max relative err: 0.00716215
-        polynomial terms: 4
+        max relative err: 0.00368885
+        polynomial terms: 5
     isotopologue: D81Br
-        max relative err: 0.0071599
-        polynomial terms: 4
+        max relative err: 0.00369201
+        polynomial terms: 5
 
 molecule 17: HI
     isotopologue: H127I
-        max relative err: 0.00768222
-        polynomial terms: 4
+        max relative err: 0.00241731
+        polynomial terms: 5
     isotopologue: D127I
-        max relative err: 0.00537589
-        polynomial terms: 4
+        max relative err: 0.000637037
+        polynomial terms: 6
 
 molecule 18: ClO
     isotopologue: 35Cl16O
-        max relative err: 0.00959434
-        polynomial terms: 7
+        max relative err: 0.00373033
+        polynomial terms: 8
     isotopologue: 37Cl16O
-        max relative err: 0.0095172
-        polynomial terms: 7
+        max relative err: 0.00369425
+        polynomial terms: 8
 
 molecule 19: OCS
     isotopologue: 16O12C32S
-        max relative err: 0.00569701
-        polynomial terms: 6
+        max relative err: 0.00302083
+        polynomial terms: 9
     isotopologue: 16O12C34S
-        max relative err: 0.00575624
-        polynomial terms: 6
+        max relative err: 0.00303858
+        polynomial terms: 9
     isotopologue: 16O13C32S
-        max relative err: 0.00535079
-        polynomial terms: 6
+        max relative err: 0.00318035
+        polynomial terms: 9
     isotopologue: 16O12C33S
-        max relative err: 0.00572502
-        polynomial terms: 6
+        max relative err: 0.00302871
+        polynomial terms: 9
     isotopologue: 18O12C32S
-        max relative err: 0.00510436
-        polynomial terms: 6
+        max relative err: 0.00313998
+        polynomial terms: 9
     isotopologue: 16O13C34S
         no Q data, copied fit from 16O12C32S
 
 molecule 20: H2CO
     isotopologue: H212C16O
-        max relative err: 0.00896949
-        polynomial terms: 7
+        max relative err: 0.00338787
+        polynomial terms: 8
     isotopologue: H213C16O
-        max relative err: 0.00658609
-        polynomial terms: 8
+        max relative err: 0.0040826
+        polynomial terms: 10
     isotopologue: H212C18O
-        max relative err: 0.00659135
-        polynomial terms: 8
+        max relative err: 0.00408498
+        polynomial terms: 10
 
 molecule 21: HOCl
     isotopologue: H16O35Cl
@@ -286,59 +290,59 @@ molecule 21: HOCl
 
 molecule 22: N2
     isotopologue: 14N2
-        max relative err: 0.00601788
-        polynomial terms: 4
+        max relative err: 0.000882162
+        polynomial terms: 5
     isotopologue: 14N15N
-        max relative err: 0.0061393
-        polynomial terms: 4
+        max relative err: 0.00100324
+        polynomial terms: 5
 
 molecule 23: HCN
     isotopologue: H12C14N
-        max relative err: 0.00810315
-        polynomial terms: 7
+        max relative err: 0.00312069
+        polynomial terms: 8
     isotopologue: H13C14N
-        max relative err: 0.00997509
-        polynomial terms: 5
+        max relative err: 0.00313379
+        polynomial terms: 8
     isotopologue: H12C15N
-        max relative err: 0.00789296
-        polynomial terms: 5
+        max relative err: 0.00271895
+        polynomial terms: 8
 
 molecule 24: CH3Cl
     isotopologue: 12CH335Cl
-        max relative err: 0.0082792
-        polynomial terms: 8
+        max relative err: 0.00435233
+        polynomial terms: 9
     isotopologue: 12CH337Cl
-        max relative err: 0.00827845
-        polynomial terms: 8
+        max relative err: 0.00435194
+        polynomial terms: 9
 
 molecule 25: H2O2
     isotopologue: H216O2
-        max relative err: 0.00673952
-        polynomial terms: 11
+        max relative err: 0.0035906
+        polynomial terms: 12
 
 molecule 26: C2H2
     isotopologue: 12C2H2
-        max relative err: 0.00641917
-        polynomial terms: 8
+        max relative err: 0.00240632
+        polynomial terms: 9
     isotopologue: H12C13CH
-        max relative err: 0.0067314
-        polynomial terms: 8
+        max relative err: 0.00238069
+        polynomial terms: 9
     isotopologue: H12C12CD
         max relative err: 0.00499777
         polynomial terms: 9
 
 molecule 27: C2H6
     isotopologue: 12C2H6
-        max relative err: 0.00840525
-        polynomial terms: 9
+        max relative err: 0.00261926
+        polynomial terms: 12
     isotopologue: 12CH313CH3
-        max relative err: 0.00843367
-        polynomial terms: 9
+        max relative err: 0.00261962
+        polynomial terms: 12
 
 molecule 28: PH3
     isotopologue: 31PH3
-        max relative err: 0.00605219
-        polynomial terms: 8
+        max relative err: 0.00406972
+        polynomial terms: 9
 
 molecule 29: COF2
     isotopologue: 12C16O19F2
@@ -355,14 +359,14 @@ molecule 30: SF6
 
 molecule 31: H2S
     isotopologue: H232S
-        max relative err: 0.00561942
-        polynomial terms: 8
+        max relative err: 0.00260163
+        polynomial terms: 9
     isotopologue: H234S
-        max relative err: 0.00834623
-        polynomial terms: 8
+        max relative err: 0.00497271
+        polynomial terms: 9
     isotopologue: H233S
-        max relative err: 0.00834563
-        polynomial terms: 8
+        max relative err: 0.00497229
+        polynomial terms: 9
 
 molecule 32: HCOOH
     isotopologue: H12C16O16OH
@@ -371,8 +375,8 @@ molecule 32: HCOOH
 
 molecule 33: HO2
     isotopologue: H16O2
-        max relative err: 0.0074005
-        polynomial terms: 8
+        max relative err: 0.00370961
+        polynomial terms: 10
 
 molecule 34: O
     isotopologue: 16O
@@ -388,42 +392,42 @@ molecule 35: ClONO2
 
 molecule 36: NO+
     isotopologue: 14N16O+
-        max relative err: 0.0058884
-        polynomial terms: 4
+        max relative err: 0.000842833
+        polynomial terms: 5
 
 molecule 37: HOBr
     isotopologue: H16O79Br
-        max relative err: 0.00514753
-        polynomial terms: 9
+        max relative err: 0.00214974
+        polynomial terms: 10
     isotopologue: H16O81Br
-        max relative err: 0.00516245
-        polynomial terms: 9
+        max relative err: 0.00217468
+        polynomial terms: 10
 
 molecule 38: C2H4
     isotopologue: 12C2H4
-        max relative err: 0.00912063
-        polynomial terms: 7
+        max relative err: 0.00491903
+        polynomial terms: 8
     isotopologue: 12CH213CH2
-        max relative err: 0.00912058
-        polynomial terms: 7
+        max relative err: 0.00492329
+        polynomial terms: 8
 
 molecule 39: CH3OH
     isotopologue: 12CH316OH
-        max relative err: 0.00628344
-        polynomial terms: 11
+        max relative err: 0.00301478
+        polynomial terms: 12
 
 molecule 40: CH3Br
     isotopologue: 12CH379Br
-        max relative err: 0.00541242
-        polynomial terms: 9
+        max relative err: 0.00329535
+        polynomial terms: 10
     isotopologue: 12CH381Br
-        max relative err: 0.00543688
-        polynomial terms: 9
+        max relative err: 0.0033017
+        polynomial terms: 10
 
 molecule 41: CH3CN
     isotopologue: 12CH312C14N
-        max relative err: 0.00538068
-        polynomial terms: 11
+        max relative err: 0.00185711
+        polynomial terms: 12
 
 molecule 42: CF4
     isotopologue: 12C19F4
@@ -436,48 +440,48 @@ molecule 43: C4H2
 
 molecule 44: HC3N
     isotopologue: H12C314N
-        max relative err: 0.00618819
-        polynomial terms: 9
+        max relative err: 0.00233014
+        polynomial terms: 10
 
 molecule 45: H2
     isotopologue: H2
-        max relative err: 0.007202
-        polynomial terms: 11
+        max relative err: 0.00493014
+        polynomial terms: 16
     isotopologue: HD
-        max relative err: 0.00850667
-        polynomial terms: 11
+        max relative err: 0.00354935
+        polynomial terms: 13
 
 molecule 46: CS
     isotopologue: 12C32S
-        max relative err: 0.00531789
-        polynomial terms: 4
+        max relative err: 0.00243654
+        polynomial terms: 6
     isotopologue: 12C34S
-        max relative err: 0.0054543
-        polynomial terms: 4
+        max relative err: 0.00253057
+        polynomial terms: 6
     isotopologue: 13C32S
-        max relative err: 0.00580489
-        polynomial terms: 4
+        max relative err: 0.00277578
+        polynomial terms: 6
     isotopologue: 12C33S
-        max relative err: 0.005388
-        polynomial terms: 4
+        max relative err: 0.00248488
+        polynomial terms: 6
 
 molecule 47: SO3
     isotopologue: 32S16O3
-        max relative err: 0.0082588
-        polynomial terms: 9
+        max relative err: 0.00214849
+        polynomial terms: 11
 
 molecule 48: C2N2
     isotopologue: 12C214N2
-        max relative err: 0.00783152
-        polynomial terms: 8
+        max relative err: 0.00331692
+        polynomial terms: 9
 
 molecule 49: COCl2
     isotopologue: 12C16O35Cl2
-        max relative err: 0.00669637
-        polynomial terms: 10
+        max relative err: 0.00294816
+        polynomial terms: 11
     isotopologue: 12C16O35Cl37Cl
-        max relative err: 0.00669279
-        polynomial terms: 10
+        max relative err: 0.00294711
+        polynomial terms: 11
 
 molecule 53: CS2
     isotopologue: 12C32S2

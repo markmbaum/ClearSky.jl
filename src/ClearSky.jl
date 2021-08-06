@@ -6,14 +6,15 @@ using BasicInterpolators
 using Cubature: hquadrature
 using QuadGK: gauss
 using ScalarRadau
+using ProgressMeter: Progress, next!
 
 #order matters
 include("constants.jl")
 include("util.jl")
-include("molparam.jl")
 include("par.jl")
 include("faddeyeva.jl")
 include("line_shapes.jl")
+include("molparam.jl")
 include("gases.jl")
 include("collision_induced_absorption.jl")
 include("atmospherics.jl")
@@ -24,6 +25,5 @@ include("orbits.jl")
 include("insolation.jl")
 
 using .Faddeyeva
-export faddeyeva
 
 end

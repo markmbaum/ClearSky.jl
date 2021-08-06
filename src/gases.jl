@@ -84,39 +84,51 @@ end
 #-------------------------------------------------------------------------------
 #function for building gas opacity tables
 
-function bake(sl::SpectralLines,
-              Cfun::F,
-              shape!::G,
-              Δνcut::Real,
-              ν::Vector{Float64},
-              Ω::AtmosphericDomain
-              )::Vector{OpacityTable} where {F, G<:Function}
+function checkν(ν::Vector{Float64})::Nothing
     #check wavenumbers for problems
     @assert all(diff(ν) .> 0) "wavenumbers must be unique and in ascending order"
     @assert all(ν .>= 0) "wavenumbers must be positive"
+    nothing
+end
+
+function bake(sl::SpectralLines,
+              fC::F,
+              shape!::G,
+              Δνcut::Real,
+              ν::Vector{Float64},
+              Ω::AtmosphericDomain,
+              progress::Bool=true
+              )::Vector{OpacityTable} where {F, G<:Function}
+    checkν(ν)
     #number of wavenumbers
     nν = length(ν)
     #create a single block of cross-sections
     σ = zeros(nν, Ω.nT, Ω.nP)
-    #fill it by evaluating in batches of wavenumbers (slow part)
-    @threads for i = 1:Ω.nT # @distributed??
-        for j = 1:Ω.nP
+    #initialize progress meter if desired
+    if progress
+        prg = Progress(Ω.nT*Ω.nP, 0.1, "evaluating $(sl.formula) cross-sections ")
+    end
+    #fill σ by evaluating in batches of wavenumbers (slow part)
+    @inbounds @threads for i ∈ eachindex(Ω.T)
+        for j ∈ eachindex(Ω.P)
             #get a view into the big σ array
-            σᵢⱼ = view(σ,:,i,j)
+            σᵢⱼ = @view σ[:,i,j]
             #get temperature, pressure, concentration
             T = Ω.T[i]
             P = Ω.P[j]
-            C = Cfun(T, P)
+            C = fC(T, P)
             #make sure concentration isn't wacky
             @assert 0 <= C <= 1 "gas molar concentrations must be in [0,1], not $C (encountered @ $T K, $P Pa)"
             #evaluate line shapes (slow part)
             shape!(σᵢⱼ, ν, sl, T, P, C*P, Δνcut)
+            #update progress meter
+            progress && next!(prg)
         end
     end
     #check for weirdness
     z = zeros(Bool, nν)
-    for i = 1:nν
-        σᵥ = view(σ,i,:,:)
+    for i ∈ 1:nν
+        σᵥ = @view σ[i,:,:]
         if (minimum(σᵥ) == 0) & (maximum(σᵥ) > 0)
             z[i] = true
         end
@@ -127,7 +139,7 @@ function bake(sl::SpectralLines,
     end
     #split the block and create interpolators for each ν
     Π = Vector{OpacityTable}(undef, nν)
-    @threads for i = 1:nν
+    @inbounds @threads for i ∈ 1:nν
         Π[i] = OpacityTable(Ω.T, Ω.P, σ[i,:,:])
     end
     #fresh out the oven
@@ -212,17 +224,24 @@ function WellMixedGas(sl::SpectralLines,
                       ν::AbstractVector{<:Real},
                       Ω::AtmosphericDomain,
                       shape!::Function=voigt!,
-                      Δνcut::Real=25)
+                      Δνcut::Real=25;
+                      progress::Bool=true)
     μ = meanmolarmass(sl)
     ν = collect(Float64, ν)
     Δνcut = convert(Float64, Δνcut)
-    Π = bake(sl, (T,P)->C, shape!, Δνcut, ν, Ω)
+    Π = bake(sl, (T,P)->C, shape!, Δνcut, ν, Ω, progress)
     WellMixedGas(sl.name, sl.formula, μ, C, ν, Ω, Π)
 end
 
-function WellMixedGas(par, C, ν, Ω, shape!::Function=voigt!, Δνcut=25; kwargs...)
-    sl = SpectralLines(par; kwargs...)
-    WellMixedGas(sl, C, ν, Ω, shape!, Δνcut)
+function WellMixedGas(filename::String,
+                      C::Real,
+                      ν::AbstractVector{<:Real},
+                      Ω::AtmosphericDomain,
+                      shape!::Function=voigt!,
+                      Δνcut=25;
+                      kwargs...)
+    sl = SpectralLines(filename; kwargs...)
+    WellMixedGas(sl, C, ν, Ω, shape!, Δνcut; kwargs...)
 end
 
 #-------------------------------
@@ -232,7 +251,7 @@ Gas type for variable concentration, radiatively active, atmospheric constituent
 
 # Constructors
 
-    VariableGas(sl::SpectralLines, C, ν, Ω, shape!=voigt!)
+    VariableGas(sl::SpectralLines, C, ν, Ω, shape!=voigt!, Δνcut=25; progress=true)
 
 * `sl`: a [`SpectralLines`](@ref) object
 * `C`: molar concentration of the constituent [mole/mole] as a function of temperature and pressure `C(T,P)`
@@ -240,9 +259,10 @@ Gas type for variable concentration, radiatively active, atmospheric constituent
 * `Ω`: [`AtmosphericDomain`](@ref)
 * `shape!`: line shape to use, must be the in-place version ([`voigt!`](@ref), [`lorentz!`](@ref), etc.)
 * `Δνcut`: profile truncation distance [cm``^{-1}``]
+* `progress`: whether to display the progress meter
 
 
-    VariableGas(par::String, C, ν, Ω, shape!=voigt!, Δνcut=25; kwargs...)
+    VariableGas(par::String, C, ν, Ω, shape!=voigt!, Δνcut=25; progress=true)
 
 Same arguments as the first constructor, but reads a `par` file directly into the gas object. Keyword arguments are passed through to [`readpar`](@ref).
 """
@@ -261,16 +281,24 @@ function VariableGas(sl::SpectralLines,
                      ν::AbstractVector{<:Real},
                      Ω::AtmosphericDomain,
                      shape!::Function=voigt!,
-                     Δνcut::Real=25) where {Q}
+                     Δνcut::Real=25;
+                     progress::Bool=true
+                     ) where {Q}
     μ = meanmolarmass(sl)
     ν = collect(Float64, ν)
-    Π = bake(sl, C, shape!, Δνcut, ν, Ω)
+    Π = bake(sl, C, shape!, Δνcut, ν, Ω, progress)
     VariableGas(sl.name, sl.formula, μ, C, ν, Ω, Π)
 end
 
-function VariableGas(par, C, ν, Ω, shape!::Function=voigt!, Δνcut=25; kwargs...)
-    sl = SpectralLines(par; kwargs...)
-    VariableGas(sl, C, ν, Ω, shape!, Δνcut)
+function VariableGas(filename::String,
+                     C::Q,
+                     ν::AbstractVector{<:Real},
+                     Ω::AtmosphericDomain,
+                     shape!::Function=voigt!,
+                     Δνcut=25;
+                     kwargs...) where {Q}
+    sl = SpectralLines(filename; kwargs...)
+    VariableGas(sl, C, ν, Ω, shape!, Δνcut; kwargs...)
 end
 
 #-------------------------------

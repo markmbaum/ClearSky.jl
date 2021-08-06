@@ -207,45 +207,43 @@ function netflux(P::AbstractVector{<:Real},
     ν, nν = A.ν, A.nν
     ω = reverse(P2ω.(P))
     ι = P2ι.(P)
-
-    #number of threads
-    nthr = nthreads()
+ 
     #temporary storage
-    X = zeros(Float64, nP, nthr)
+    X = zeros(Float64, nP, nthreads())
     #surface temperature
-    Tₛ = fT(P[1]) #surface temperature
+    Tₛ = fT(maximum(P)) #surface temperature
+    #angle factor for incoming stellar light
+    m = 1/cos(θₛ)
     #big blocks of flux
     M⁺ = zeros(Float64, nP, nν) #monochromatic upward fluxes
     M⁻ = zeros(Float64, nP, nν) #monochromatic downward fluxes
-    #F⁺ = zeros(Float64, nP) #total updward fluxes
-    #F⁻ = zeros(Float64, nP) #total downward fluxes
     Fₙ = zeros(Float64, nP) #net fluxes
     
-    @threads for i ∈ eachindex(ν)
+    for i ∈ eachindex(ν)
         #temporary storage
-        x = view(X, :, threadid())
+        x = @view X[:,threadid()]
         #downward stellar irradiance
         I₀ = fS(ν[i])
         #downward stellar irradiance through atmosphere
-        M = view(M⁻, :, i)
-        stream!(dIdι, I₀, M, ι, ι[1], ι[end], A, i, g, 1/cos(θₛ), fT, fμ, tol)
+        M = @view M⁻[:,i]
+        stream!(dIdι, I₀, M, ι, ι[1], ι[end], A, i, g, m, fT, fμ, tol)
         M .*= cos(θₛ) #convert to flux
         #some of the stellar flux is reflected
         Iₛ⁺ = M[end]*fα(ν[i])/π #Lambertian reflection
         #and the surface emits radiation
         I₀ = Iₛ⁺ + planck(ν[i], Tₛ)
         #total upward radiation streams
-        M = view(M⁺, nP:-1:1, i) #reversed view, from surface to TOA
+        M = @view M⁺[nP:-1:1,i] #reversed view, from surface to TOA
         streams!(dIdω, I₀, x, M, ω, ω[1], ω[end], A, i, g, nstream, fT, fμ, tol)
         #downward atmospheric contribution
-        M = view(M⁻, :, i)
+        M = @view M⁻[:,i]
         streams!(dIdι, 0.0, x, M, ι, ι[1], ι[end], A, i, g, nstream, fT, fμ, tol)
     end
 
     @threads for i ∈ eachindex(P)
-        Fₙ[i] = trapz(ν, view(M⁺, i, :)) - trapz(ν, view(M⁻, i, :))
+        Fₙ[i] = trapz(ν, @view M⁺[i,:]) - trapz(ν, @view M⁻[i,:])
     end
 
     return reverse(Fₙ)
-
 end
+    

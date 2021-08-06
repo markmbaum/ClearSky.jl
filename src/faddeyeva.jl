@@ -142,11 +142,11 @@ end
 
 Evaluate only the real part of the [Faddeyeva function](https://en.wikipedia.org/wiki/Faddeeva_function) from the complex argument ``x + iy``
 """
-function faddeyeva(x::Real, y::Real)::Float64
+function faddeyeva(x::T, y::T)::Float64 where {T<:Real}
 
-    x² = x*x
-    y² = y*y
-    s = x² + y²
+    x²::T = x*x
+    y²::T = y*y
+    s::T = x² + y²
 
     #region 1: Laplace continued fractions, 1 convergent
     if s >= s0

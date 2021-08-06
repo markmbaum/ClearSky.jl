@@ -5,6 +5,41 @@ const sqln2 = sqrt(log(2.0))
 const c2 = 100.0*𝐡*𝐜/𝐤
 
 #-------------------------------------------------------------------------------
+# struct for molecule parameters
+
+struct MolParam
+    #molecule number
+    M::Int64
+    #molecular formula
+    formula::String
+    #molecule name
+    name::String
+    #global isotopologue codes
+    I::Vector{Int64}
+    #isopologue formulae
+    isoform::Vector{String}
+    #AFGL isotopologue codes
+    AFGL::Vector{Int64}
+    #abundance fractions
+    A::Vector{Float64}
+    #molecular masses [kg/mole]
+    μ::Vector{Float64}
+    #Qref
+    Qref::Vector{Float64}
+    #flag, has interpolating chebyshev polynomial
+    hascheb::Vector{Bool}
+    #length of cheby polys
+    ncheb::Vector{Int64}
+    #maximum rel err of cheb polys
+    maxrelerr::Vector{Float64}
+    #chebyshev expansion coefficients
+    cheb::Vector{Vector{Float64}}
+end
+
+#for empty structs
+MolParam() = MolParam(-1, "", "", [], [], [], [], [], [], [], [], [], [])
+
+#-------------------------------------------------------------------------------
 # wavenumber truncation of line shapes
 
 cutline(ν, νl, Δνcut)::Bool = abs(ν - νl) > Δνcut ? true : false
@@ -28,15 +63,15 @@ function chebyQrefQ(T::Real, n::Int64, a::Vector{Float64})::Float64
     #check the temperature range
     @assert TMIN <= T <= TMAX "temperature outside of Qref/Q interpolation range"
     #map T to [-1,1]
-    τ = 2*(T - TMIN)/(TMAX - TMIN) - 1
+    τ::Float64 = 2*(T - TMIN)/(TMAX - TMIN) - 1
     #values of first two chebys at τ
-    c₁ = 1.0
-    c₂ = τ
+    c₁::Float64 = 1.0
+    c₂::Float64 = τ
     #value of expansion after first two terms
     y = a[1] + a[2]*c₂
-    for k = 3:n
+    @inbounds for k = 3:n
         #next cheby value
-        c₃ = 2*τ*c₂ - c₁
+        c₃::Float64 = 2*τ*c₂ - c₁
         #contribute to expansion
         y += a[k]*c₃
         #swap values
@@ -58,27 +93,31 @@ function surf!(σ::AbstractVector,
                A::Vararg{Vector{Float64},N}) where {F<:Function, N}
     @assert all(diff(ν) .> 0) "wavenumber vectors must be sorted in ascending order"
     L = length(νl)
-    jstart = 1 #tracking index to avoid searching from beginning every time
-    for i = eachindex(ν)
+    j₁ = 1 #tracking index to avoid searching from beginning every time
+    for i ∈ eachindex(ν)
+        #temporary stack value
+        σᵢ::Float64 = 0.0
         #find the first line that isn't cut off
-        j = jstart
-        while (j <= L) && cutline(ν[i], νl[j], Δνcut)
+        j = j₁
+        @inbounds while (j <= L) & cutline(ν[i], νl[j], Δνcut)
             j += 1
         end
         #only proceed if there is a line to include
         if j <= L
             #update the starting index for the search
-            jstart = j
+            j₁ = j
             #evaluate line profiles until one gets cut off, then move on
-            while (j <= L) && !cutline(ν[i], νl[j], Δνcut)
+            @inbounds while !cutline(ν[i], νl[j], Δνcut) && (j <= L)
                 #let block is required for good performance
                 args = let k = j
-                    ntuple(n->A[n][k], N)
+                    @inbounds ntuple(n->A[n][k], N)
                 end
-                σ[i] += f(ν[i], νl[j], args...)
+                @inbounds σᵢ += f(ν[i], νl[j], args...)
                 j += 1
             end
         end
+        #set the array value
+        σ[i] = σᵢ
     end
 end
 
@@ -108,22 +147,23 @@ function scaleintensity(S, νl, Epp, M::Int16, I::Int16, T)::Float64
     n = exp(a/T)*(1 - exp(b/T))
     d = exp(a/𝐓ᵣ)*(1 - exp(b/𝐓ᵣ))
     #check if there is an approximating function
-    if MOLPARAM[M][10][I]
-        QrefQ = chebyQrefQ(T, MOLPARAM[M][11][I], MOLPARAM[M][13][I])
+    if MOLPARAM[M].hascheb[I]
+        QrefQ = chebyQrefQ(T, MOLPARAM[M].ncheb[I], MOLPARAM[M].cheb[I])
     else
-        throw("no interpolating polynomial available to compute Qref/Q for isotopologue $I of $(MOLPARAM[M][3]) ($(MOLPARAM[M][2]))")
+        throw("no interpolating polynomial available to compute Qref/Q for isotopologue $I of $(MOLPARAM[M].name) ($(MOLPARAM[M].formula))")
         #QrefQ = (𝐓ᵣ/T)^1.5
     end
     #shifted line intensity
     S*QrefQ*(n/d)
 end
 
-function scaleintensity(sl::SpectralLines, i::Vector{Int64}, T)::Vector{Float64}
-    S = view(sl.S, i)
-    ν = view(sl.ν, i)
-    Epp = view(sl.Epp, i)
-    I = view(sl.I, i)
-    scaleintensity.(S, ν, Epp, sl.M, I, T)
+function scaleintensity(sl::SpectralLines, idx::Vector{Int64}, T)::Vector{Float64}
+    Sₛ = zeros(Float64, length(idx))
+    for i ∈ eachindex(idx)
+        j = idx[i]
+        @inbounds Sₛ[i] = scaleintensity(sl.S[j], sl.ν[j], sl.Epp[j], sl.M[j], sl.I[j], T)
+    end
+    return Sₛ
 end
 
 #-------------------------------------------------------------------------------

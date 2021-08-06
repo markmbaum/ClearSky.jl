@@ -16,7 +16,7 @@ const ISOINDEX = Dict(
 )
 
 """
-    readpar(filename; νmin=0, νmax=Inf, Scut=0, I=[], maxlines=-1)
+    readpar(filename; νmin=0, νmax=Inf, Scut=0, I=[], maxlines=-1, progress=true)
 
 Read an absoption line file from the HITRAN database, which should have the ".par" extension. These files are available at [`https://hitran.org/lbl`](https://hitran.org/lbl) after registering for a free account.
 
@@ -26,6 +26,7 @@ Read an absoption line file from the HITRAN database, which should have the ".pa
 * `Scut`: smallest spectral line intensity
 * `I`: array of isotopologue numbers to include (excludes all others)
 * `maxlines`: maximum number of lines to include (includes only the most intense `maxlines` lines)
+* `progress`: whether to display the progress meter
 
 A dictionary of vectors is returned, reflecting the definitions from
 1. [HITRAN website](https://hitran.org/docs/definitions-and-units`)
@@ -58,7 +59,8 @@ function readpar(filename::String;
                  νmax::Real=Inf,
                  Scut::Real=0,
                  I::Vector=[],
-                 maxlines::Int=-1)
+                 maxlines::Int=-1,
+                 progress::Bool=true)
     @assert filename[end-3:end] == ".par" "expected file with .par extension, downloaded from https://hitran.org/lbl/"
     lines = readlines(filename)
     N = length(lines)
@@ -84,17 +86,23 @@ function readpar(filename::String;
         "gp"  =>Vector{String}(undef, N),
         "gpp" =>Vector{String}(undef, N)
     )
-    for (i,line) in enumerate(lines)
-        par["M"][i]    = parse(Int16, SubString(line,1,2))
+    if progress
+        prg = Progress(length(lines), 0.1, "Parsing \"$(splitdir(filename)[end])\" ")
+    end
+    @inbounds for i in eachindex(lines)
+        #get the line in question
+        line = lines[i]
+        #parse all the fields
+        par["M"][i]    = parse(Int16, line[1:2])
         par["I"][i]    = line[3]
-        par["ν"][i]    = parse(Float64, SubString(line,4,15))
-        par["S"][i]    = parse(Float64, SubString(line,16,25))
-        par["A"][i]    = parse(Float64, SubString(line,26,35))
-        par["γa"][i]   = parse(Float64, SubString(line,36,40))
-        par["γs"][i]   = parse(Float64, SubString(line,41,45))
-        par["Epp"][i]  = parse(Float64, SubString(line,46,55))
-        par["na"][i]   = parse(Float64, SubString(line,56,59))
-        par["δa"][i]   = parse(Float64, SubString(line,60,67))
+        par["ν"][i]    = parse(Float64, line[4:15])
+        par["S"][i]    = parse(Float64, line[16:25])
+        par["A"][i]    = parse(Float64, line[26:35])
+        par["γa"][i]   = parse(Float64, line[36:40])
+        par["γs"][i]   = parse(Float64, line[41:45])
+        par["Epp"][i]  = parse(Float64, line[46:55])
+        par["na"][i]   = parse(Float64, line[56:59])
+        par["δa"][i]   = parse(Float64, line[60:67])
         par["Vp"][i]   = line[68:82]
         par["Vpp"][i]  = line[83:97]
         par["Qp"][i]   = line[98:112]
@@ -104,6 +112,8 @@ function readpar(filename::String;
         par["*"][i]    = line[146]
         par["gp"][i]   = line[147:153]
         par["gpp"][i]  = line[154:160]
+        #update progress meter
+        progress && next!(prg)
     end
     #filtering
     mask = ones(Bool, N)
@@ -212,12 +222,12 @@ function SpectralLines(par::Dict)
     @assert length(unique(par["M"])) == 1 "SpectralLines objects must contain only one molecule's lines"
     #get the molecule name and formula
     M = par["M"][1]
-    name = MOLPARAM[M][3]
-    form = MOLPARAM[M][2]
+    name = MOLPARAM[M].name
+    form = MOLPARAM[M].formula
     #create arrays for isotopologue index, abundance, and molar mass
     I = map(i->ISOINDEX[par["I"][i]], 1:N)
-    A = map(i->MOLPARAM[M][7][I[i]], 1:N)
-    μ = map(i->MOLPARAM[M][8][I[i]], 1:N)
+    A = map(i->MOLPARAM[M].A[I[i]], 1:N)
+    μ = map(i->MOLPARAM[M].μ[I[i]], 1:N)
     #get sorting indices to make sure ν vector is in ascending order
     idx = sortperm(par["ν"])
     #create a SpectralLines structure
@@ -238,7 +248,4 @@ function SpectralLines(par::Dict)
     )
 end
 
-function SpectralLines(filename::String; kwargs...)
-    par = readpar(filename; kwargs...)
-    SpectralLines(par)
-end
+SpectralLines(fn::String; kwargs...) = SpectralLines(readpar(fn; kwargs...))

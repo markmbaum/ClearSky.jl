@@ -287,7 +287,7 @@ end
 function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F;
                       Tstrat=0.0,
                       Ptropo=0.0,
-                      N::Int=1000,
+                      N::Int=100,
                       Pₜ=PMIN) where {F}
     checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
     #interpolation knots and output vector
