@@ -1,5 +1,5 @@
 for i in 1:length(MOLPARAM)
-    if length(MOLPARAM[i]) > 1
+    if length(MOLPARAM[i].I) > 1
         bcheb = MOLPARAM[i].hascheb
         ncheb = MOLPARAM[i].ncheb
         rlerr = MOLPARAM[i].maxrelerr

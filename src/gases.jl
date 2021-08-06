@@ -109,7 +109,7 @@ function bake(sl::SpectralLines,
         prg = Progress(Ω.nT*Ω.nP, 0.1, "evaluating $(sl.formula) cross-sections ")
     end
     #fill σ by evaluating in batches of wavenumbers (slow part)
-    @inbounds @threads for i ∈ eachindex(Ω.T)
+    @threads for i ∈ eachindex(Ω.T)
         for j ∈ eachindex(Ω.P)
             #get a view into the big σ array
             σᵢⱼ = @view σ[:,i,j]
@@ -139,7 +139,7 @@ function bake(sl::SpectralLines,
     end
     #split the block and create interpolators for each ν
     Π = Vector{OpacityTable}(undef, nν)
-    @inbounds @threads for i ∈ 1:nν
+    @threads for i ∈ eachindex(ν)
         Π[i] = OpacityTable(Ω.T, Ω.P, σ[i,:,:])
     end
     #fresh out the oven

@@ -99,7 +99,7 @@ function surf!(σ::AbstractVector,
         σᵢ::Float64 = 0.0
         #find the first line that isn't cut off
         j = j₁
-        @inbounds while (j <= L) & cutline(ν[i], νl[j], Δνcut)
+        @inbounds while (j <= L) && cutline(ν[i], νl[j], Δνcut)
             j += 1
         end
         #only proceed if there is a line to include
@@ -107,7 +107,7 @@ function surf!(σ::AbstractVector,
             #update the starting index for the search
             j₁ = j
             #evaluate line profiles until one gets cut off, then move on
-            @inbounds while !cutline(ν[i], νl[j], Δνcut) && (j <= L)
+            @inbounds while (j <= L) && !cutline(ν[i], νl[j], Δνcut)
                 #let block is required for good performance
                 args = let k = j
                     @inbounds ntuple(n->A[n][k], N)

@@ -1,3 +1,5 @@
+pushfirst!(LOAD_PATH, "C:/Users/markm/Documents/code")
+println("WOO")
 using ClearSky
 using Test
 using SpecialFunctions

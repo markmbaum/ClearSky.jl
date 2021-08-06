@@ -33,10 +33,10 @@ t = transmittance(Pₛ, Pₜ, g, Γ, fμ, θ, A)
 olr = outgoing(Pₛ, g, Γ, fμ, A)
 @test issane(olr)
 
-Fₜ⁻, Fₜ⁺ = topfluxes(Pₛ, g, Γ, fμ, fstellar, falbedo, A)
+Fₜ⁻, Fₜ⁺ = topflux(Pₛ, g, Γ, fμ, fstellar, falbedo, A)
 @test issane(Fₜ⁻)
 @test issane(Fₜ⁺)
 
-Fₛ⁻, Fₛ⁺ = bottomfluxes(Pₛ, g, Γ, fμ, fstellar, falbedo, A)
+Fₛ⁻, Fₛ⁺ = surfaceflux(Pₛ, g, Γ, fμ, fstellar, falbedo, A)
 @test issane(Fₛ⁻)
 @test issane(Fₛ⁺)
