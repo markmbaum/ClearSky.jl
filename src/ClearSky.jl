@@ -1,9 +1,10 @@
 module ClearSky
 
 using Base: tail
-using Base.Threads: @threads, nthreads, threadid
+using Base.Threads: @threads, @spawn, Task, fetch
 using BasicInterpolators
 using Cubature: hquadrature
+using Faddeyeva985
 using QuadGK: gauss
 using ScalarRadau
 using ProgressMeter: Progress, next!
@@ -12,7 +13,6 @@ using ProgressMeter: Progress, next!
 include("constants.jl")
 include("util.jl")
 include("par.jl")
-include("faddeyeva.jl")
 include("line_shapes.jl")
 include("molparam.jl")
 include("gases.jl")
@@ -23,7 +23,5 @@ include("modeling_core.jl")
 include("modeling.jl")
 include("orbits.jl")
 include("insolation.jl")
-
-using .Faddeyeva
 
 end

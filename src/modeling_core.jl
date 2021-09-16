@@ -1,7 +1,7 @@
 #-------------------------------------------------------------------------------
 # general gets and checks
 
-function pressurelimits(gases)::NTuple{2,Float64}
+function pressurelimits(gases::Tuple)::NTuple{2,Float64}
     #largest minimum pressure in gas atmospheric domains
     Pmin = maximum(map(g->g.Ω.Pmin, gases))
     #smallest maximum pressure in gas atmospheric domains
@@ -9,7 +9,7 @@ function pressurelimits(gases)::NTuple{2,Float64}
     return Pmin, Pmax
 end
 
-function checkpressures(gases, Pₛ, Pₜ)::Nothing
+function checkpressures(gases::Tuple, Pₛ, Pₜ)::Nothing
     @assert Pₛ > Pₜ "Pₛ must be greater than Pₜ"
     #pressure bounds
     Pmin, Pmax = pressurelimits(gases)
@@ -27,13 +27,13 @@ function checkazimuth(θ)::Nothing
 end
 
 function getwavenumbers(absorbers::Tuple)::Vector{Float64}
-    G = absorbers[findall(a -> typeof(a) <: AbstractGas, absorbers)]
+    G = absorbers[findall(a -> typeof(a) <: Gas, absorbers)]
     @assert length(G) > 0 "no gas objects found"
     getwavenumbers(G...)
 end
 
 #checks for identical wavenumber sampling across different gases
-function getwavenumbers(G::AbstractGas...)::Vector{Float64}
+function getwavenumbers(G::Gas...)::Vector{Float64}
     ν₁ = G[1].ν
     for g ∈ G
         @assert ν₁ == g.ν "gases must have identical wavenumber vectors"
@@ -44,41 +44,37 @@ end
 #-------------------------------------------------------------------------------
 # super for both consolidated absorber types
 
-abstract type UnifiedAbsorber end
+abstract type AbstractAbsorber end
 
-export UnifiedAbsorber, noabsorption, getσ
+export AbstractAbsorber, getσ
 
 #-------------------------------------------------------------------------------
 # specialized container for absorbing objects and functions
 
-export GroupedAbsorber
+export UnifiedAbsorber
 
 """
-    GroupedAbsorber(absorbers...)
+    UnifiedAbsorber(absorbers...)
 
-A struct for consolidating absorbers. Construct with any number of [gas objects](gas_objects.md), functions in the form `σ(ν, T, P)` and [`CIATables`](@ref).
+A struct for consolidating absorbers. Construct with any number of [gas objects](gas_objects.md), functions in the form `σ(ν, T, P)`, and [`CIATables`](@ref).
 """
-struct GroupedAbsorber{T,U,V} <: UnifiedAbsorber
-    #tuple of gas objects
+struct UnifiedAbsorber{T,U,V} <: AbstractAbsorber
+    #tuple of Gas objects
     gas::T
-    #tuple of CIA objects
+    #tuple of Gas objects
     cia::U
-    #tuple of functions in the for f(ν, T, P)
+    #tuple of Gas objects
     fun::V
     #wavenumber vector [cm^-1], must be identical for all gases
     ν::Vector{Float64}
     #length of wavenumber vector
     nν::Int64
-    #flag indicating whether cia and fun are both empty
-    gasonly::Bool
-    #flags indicating where all gas objects are empty
-    gasempty::Vector{Bool}
 end
 
-GroupedAbsorber(absorbers...) = GroupedAbsorber(absorbers)
+UnifiedAbsorber(absorbers...) = UnifiedAbsorber(absorbers)
 
 #splits a group of gas, cia, & functions objects into their own tuples
-function GroupedAbsorber(absorbers::Tuple)
+function UnifiedAbsorber(absorbers::Tuple)
     #can't be empty
     @assert length(absorbers) > 0 "no absorbers... nothing to group"
     #check for dups
@@ -87,48 +83,40 @@ function GroupedAbsorber(absorbers::Tuple)
     T = map(typeof, absorbers)
     #check for unexpected types
     for t ∈ T
-        if !((t <: AbstractGas) | (t == CIATables) | (t <: Function))
-            throw("absorbers must only be gasses (<: AbstractGas), CIA objects, or functions in the form σ(ν, T, P)")
+        if !((t <: Gas) | (t == CIATables) | (t <: Function))
+            throw("absorbers must only be gases (<: Gas), CIA objects, or functions in the form σ(ν, T, P)")
         end
     end
     #all gases
-    gas = absorbers[findall(t->t<:AbstractGas, T)]
+    gas = absorbers[findall(t -> t <: Gas, T)]
     #cia tables, pairing with the correct gases in the process
-    cia = tuple([CIA(x, gas) for x ∈ absorbers[findall(t->t==CIATables, T)]]...)
+    cia = tuple([CIA(x, gas) for x ∈ absorbers[findall(t -> t == CIATables, T)]]...)
     #functions in the form σ(ν, T, P)
-    fun = absorbers[findall(t->!(t<:AbstractGas) & !(t==CIATables), T)]
+    fun = absorbers[findall(t -> !(t <: Gas) & !(t == CIATables), T)]
     #wavenumber vector, must be identical for all gases
     ν = getwavenumbers(gas...)
-    #flag indicating whether there are only gases present, no cias orfunctions
-    gasonly = isempty(cia) & isempty(fun)
-    #flags indicating whether all gases are empty at each wavenumber
-    ng = length(gas)
-    gasempty = [all(ntuple(j->gas[j].Π[i].empty, ng)) for i ∈ eachindex(ν)]
-    
-    GroupedAbsorber(gas, cia, fun, ν, length(ν), gasonly, gasempty)
+    nν = length(ν)
+    #construct the UnifiedAbsorber
+    UnifiedAbsorber(gas, cia, fun, ν, nν)
 end
 
 #https://discourse.julialang.org/t/tuple-indexing-taking-time/58309/18?u=markmbaum
 #also see "applychain" here for a similar example: https://github.com/FluxML/Flux.jl/blob/dbb9f82ef8d4e196259ff1af56aeddc626159bf3/src/layers/basic.jl#L46
-σchain(::Tuple{}, x, T, P)::Float64 = 0.0
-σchain(A::Tuple,  x, T, P)::Float64 = first(A)(x, T, P) + σchain(tail(A), x, T, P)
+σchain(::Tuple{}, x, T, P) = zero(T)
 
-function getσ(G::GroupedAbsorber, i::Int, T, P)::Float64
-    ν = G.ν[i]
-    σ = σchain(G.gas, i, T, P) + σchain(G.cia, ν, T, P) + σchain(G.fun, ν, T, P)
-    return σ
+σchain(A::Tuple, x, T, P) = first(A)(x, T, P) + σchain(tail(A), x, T, P)
+
+function σchain(U::UnifiedAbsorber, i::Int, ν, T, P)
+    σchain(U.gas, i, T, P) + σchain(U.cia, ν, T, P) + σchain(U.fun, ν, T, P)
 end
 
-(G::GroupedAbsorber)(i::Int, T, P)::Float64 = getσ(G, i, T, P)
+(U::UnifiedAbsorber)(i::Int, T, P) = σchain(U, i, U.ν[i], T, P)
 
-(G::GroupedAbsorber)(T::Real, P::Real) = [G(i, T, P) for i ∈ eachindex(G.ν)]
+(U::UnifiedAbsorber)(T, P) = [U(i, T, P) for i ∈ eachindex(U.ν)]
 
-#check whether integration is pointless because there's no absorption
-noabsorption(G::GroupedAbsorber, i::Int)::Bool = G.gasonly && G.gasempty[i]
+getσ(U::UnifiedAbsorber, i::Int, T, P) = @inbounds σchain(U, i, U.ν[i], T, P)
 
-noabsorption(G::GroupedAbsorber) = [noabsorption(G, i) for i ∈ eachindex(G.ν)]
-
-checkpressures(G::GroupedAbsorber, Pₛ, Pₜ) = checkpressures(G.gas, Pₛ, Pₜ)
+checkpressures(U::UnifiedAbsorber, P...) = checkpressures(U.gas, P...)
 
 #-------------------------------------------------------------------------------
 # accelerated interpolation of cross-sections
@@ -136,92 +124,71 @@ checkpressures(G::GroupedAbsorber, Pₛ, Pₜ) = checkpressures(G.gas, Pₛ, P�
 export AcceleratedAbsorber, update!
 
 """
-    AcceleratedAbsorber(P, T, G::GroupedAbsorber)
+    AcceleratedAbsorber(P, T, G::UnifiedAbsorber)
     AcceleratedAbsorber(P, T, absorbers...)
 
 An accelerated struct for getting cross-sections from groups of absorbers. Pressure and temperature coordinates must be provided. 
 """
-struct AcceleratedAbsorber <: UnifiedAbsorber
+struct AcceleratedAbsorber <: AbstractAbsorber
     #cross-section interpolators
-    ϕ::Vector{LinearInterpolator{Float64,NoBoundaries}}
+    ϕ::Vector{LinearInterpolator{Float64, NoBoundaries}}
     #wavenumber vector [cm^-1], must be identical for all gases
     ν::Vector{Float64}
     #length of wavenumber vector
     nν::Int64
-    #flag indicating whether there is no absorption
-    empty::Vector{Bool}
     #original pressures
     P::Vector{Float64}
-    #reference to GroupedAbsorber
-    G::GroupedAbsorber
+    #reference to UnifiedAbsorber
+    U::UnifiedAbsorber
 end
 
-function AcceleratedAbsorber(P::Vector{Float64}, T::Vector{Float64}, G::GroupedAbsorber)
+function AcceleratedAbsorber(T, P, U::UnifiedAbsorber)
     #pull out wavenumber info
-    ν, nν = G.ν, G.nν
+    ν, nν = U.ν, U.nν
     #flip vectors if pressure is not ascending (interpolators require this)
-    if P[1] > P[end]
-        P = reverse(P)
-        T = reverse(T)
-    end
-    #lowest available value
-    minσ = floatmin(Float64)
+    idx = sortperm(P)
+    P = P[idx]
+    T = T[idx]
     #log pressure coordinates as usual
     logP = log.(P)
-    ϕ = Vector{LinearInterpolator{Float64,NoBoundaries}}(undef, nν)
-    empty = zeros(Bool, nν)
-    @threads for i ∈ eachindex(ν)
-        empty[i] = noabsorption(G, i)
-        if !empty[i]
-            #cross-sections from the GroupedAbsorber
-            σ = G.(i, T, P)
-            #find values so small they could wreak havoc (specifically, zeros)
-            tiny = σ .< minσ
-            #set all the tinies to the super low threshold value
-            σ[tiny] .= minσ
-            #recheck the empty flag
-            if all(tiny)
-                empty[i] = true
-            end
-            #store an interpolating object
-            ϕ[i] = LinearInterpolator(logP, log.(σ), NoBoundaries())
-        end
+    #prepare interpolators
+    ϕ = Vector{LinearInterpolator{Float64, NoBoundaries}}(undef, nν)
+    for i ∈ eachindex(ν)
+        #cross-sections from the UnifiedAbsorber
+        σ = U.(i, T, P)
+        #fix values so small they could wreak havoc (specifically, zeros)
+        #set all the tinies to the super low threshold value
+        @. σ[σ < TINY] = TINY
+        #store an interpolating object
+        ϕ[i] = LinearInterpolator(logP, log.(σ), NoBoundaries())
     end
-    AcceleratedAbsorber(ϕ, ν, nν, empty, P, G)
+    AcceleratedAbsorber(ϕ, ν, nν, P, U)
 end
 
-function AcceleratedAbsorber(P::Vector{Float64}, T::Vector{Float64}, absorbers...)
-    AcceleratedAbsorber(P, T, GroupedAbsorber(absorbers))
+function AcceleratedAbsorber(T, P, absorbers...)
+    AcceleratedAbsorber(T, P, UnifiedAbsorber(absorbers))
 end
 
-#also a method specifically for interpolators, P vs log(σ)
-function getσ(A::AcceleratedAbsorber, i, _, P)::Float64
-    A.empty[i] && return 0.0
-    @inbounds exp(A.ϕ[i](log(P)))
-end
+(A::AcceleratedAbsorber)(i::Int, P) = exp(A.ϕ[i](log(P)))
 
-(A::AcceleratedAbsorber)(i::Int, P)::Float64 = getσ(A, i, nothing, P)
+(A::AcceleratedAbsorber)(P) = [A(i, P) for i ∈ eachindex(A.ν)]
 
-(A::AcceleratedAbsorber)(P::Real) = [A(i, P) for i ∈ eachindex(A.ν)]
+getσ(A::AcceleratedAbsorber, i, T, P) = @inbounds exp(A.ϕ[i](log(P)))
 
-noabsorption(A::AcceleratedAbsorber, i::Int)::Bool = A.empty[i]
-
-noabsorption(A::AcceleratedAbsorber) = [noabsorption(A, i) for i ∈ eachindex(A.ν)]
-
-checkpressures(A::AcceleratedAbsorber, Pₛ, Pₜ) = checkpressures(A.G.gas, Pₛ, Pₜ)
+checkpressures(A::AcceleratedAbsorber, P...) = checkpressures(A.U, P...)
 
 """
     update!(A::AcceleratedAbsorber, T::Vector{Float64})
 
-Update the cross-section interpolators underlyig an `AcceleratedAbsorber` with a new set of temperatures. The new temperatures should correspond to the pressure levels used when originally constructing the `AcceleratedAbsorber`.  
+Update the cross-section interpolators underlying an `AcceleratedAbsorber` with a new set of temperatures. The new temperatures should correspond to the pressure levels used when originally constructing the `AcceleratedAbsorber`.  
 """
-function update!(A::AcceleratedAbsorber, T::Vector{Float64})
+function update!(A::AcceleratedAbsorber, T::AbstractVector{<:Real})
     @assert length(T) == length(A.P)
-    @threads for i ∈ eachindex(A.ϕ)
-        if !A.empty[i]
-            for j ∈ eachindex(A.P)
-                @inbounds A.ϕ[i].r.y[j] = max(log(A.G(i, T[j], A.P[j])), 1e-200)
-            end
+    minlnσ = log(floatmin(Float64))
+    for i ∈ eachindex(A.β)
+        σ = values(A.β[i].ϕ)
+        for j ∈ eachindex(σ)
+            @inbounds σ[j] = max(log(A.U(i, T[j], A.P[j])), minlnσ)
         end
     end
 end
@@ -229,12 +196,12 @@ end
 #-------------------------------------------------------------------------------
 #making sense of variable absorber inputs
 
-function unifyabsorbers(absorbers::Tuple)::UnifiedAbsorber
+function unifyabsorbers(absorbers::Tuple)::AbstractAbsorber
     length(absorbers) == 0 && error("no absorbers")
-    if (length(absorbers) == 1) && (typeof(absorbers[1]) <: UnifiedAbsorber)
+    if (length(absorbers) == 1) & (typeof(absorbers[1]) <: AbstractAbsorber)
         return absorbers[1]
     end
-    GroupedAbsorber(absorbers)
+    UnifiedAbsorber(absorbers)
 end
 
 #-------------------------------------------------------------------------------
@@ -242,7 +209,7 @@ end
 
 const NODECACHE = Dict{Int64,NTuple{2,Vector{Float64}}}()
 
-function _streamnodes(n::Int64)::NTuple{2,Vector{Float64}}
+function newstreamnodes(n::Int64)::NTuple{2,Vector{Float64}}
     #gauss-legendre quadrature points and weights in [-1,1]
     x, w = gauss(n)
     #map angles and weights to θ ∈ [0,π/2]
@@ -260,70 +227,65 @@ end
 
 function streamnodes(n::Int64)::NTuple{2,Vector{Float64}}
     #too few streams is likely problematic
-    if n < 4
-        @warn "careful! using nstream < 4 is likely to be inaccurate!" maxlog=1
-    end
+    n < 4 && @warn "careful! using nstream < 4 is likely to be inaccurate!" maxlog=1
     #getting the gauss nodes is pretty fast but not trivial
     if !haskey(NODECACHE, n)
         #store these values
-        NODECACHE[n] = _streamnodes(n)
+        NODECACHE[n] = newstreamnodes(n)
     end
     return NODECACHE[n]
-end
-
-#load some stream nodes in serial
-for n ∈ 1:16
-    NODECACHE[n] = _streamnodes(n)
 end
 
 #-------------------------------------------------------------------------------
 # core differential equations with Tuples of parameters
 
-function dτdP(P::Float64, τ::Float64, param::Tuple)::Float64
+function dτdP(P, τ, param::Tuple)
     #unpack parameters
-    A, i, g, m, fT, fμ = param
+    A, idx, g, m, fT, fμ = param
     #temperature from given profile
     T = fT(P)
     #mean molar mass
     μ = fμ(T, P)
     #sum of all cross-sections
-    σ = getσ(A, i, T, P)
+    σ = getσ(A, idx, T, P)
     #compute dτ/dlnP, scaled by the angle m = 1/cos(θ)
     m*dτdP(σ, g, μ) #no Planck emission
 end
 
-function dIdP(P::Float64, I::Float64, param::Tuple)::Float64
+function dIdP(P, I, param::Tuple)
     #unpack parameters
-    A, i, g, m, fT, fμ = param
+    A, idx, g, m, fT, fμ = param
     #compute temperature from given profile
     T = fT(P)
     #compute mean molar mass
     μ = fμ(T, P)
     #sum of all cross-sections
-    σ = getσ(A, i, T, P)
+    σ = getσ(A, idx, T, P)
+    #pull out wavenumber
+    ν = @inbounds A.ν[idx]
     #compute dI/dlnP, scaled by the angle m = 1/cos(θ)
-    m*schwarzschild(I, A.ν[i], σ, g, μ, T)
+    m*schwarzschild(I, ν, σ, g, μ, T)
 end
 
 #-------------------------------------------------------------------------------
 # wrappers for log pressure coordinates
 
-function dτdι(ι::Float64, τ::Float64, param::Tuple)::Float64
+function dτdι(ι, τ, param::Tuple)
     P = ι2P(ι)
     P*dτdP(P, τ, param)
 end
 
-function dτdω(ω::Float64, τ::Float64, param::Tuple)::Float64
+function dτdω(ω, τ, param::Tuple)
     P = ω2P(ω)
     P*dτdP(P, τ, param)
 end
 
-function dIdω(ω::Float64, I::Float64, param::Tuple)::Float64
+function dIdω(ω, I, param::Tuple)
     P = ω2P(ω)
     P*dIdP(P, I, param)
 end
 
-function dIdι(ι::Float64, I::Float64, param::Tuple)::Float64
+function dIdι(ι, I, param::Tuple)
     P = ι2P(ι)
     P*dIdP(P, I, param)
 end
@@ -334,16 +296,14 @@ end
 function depth(dτdx::Q,
                x₁::Real,
                x₂::Real,
-               A::UnifiedAbsorber,
+               A::R,
                idx::Int,
                g::Real,
                m::Real, # 1/cos(θ)
-               fT::R,
-               fμ::S,
+               fT::S,
+               fμ::U,
                tol::Float64
-               )::Float64 where {Q,R,S}
-    #if zero absorption, don't integrate
-    noabsorption(A, idx) && return 0.0
+               ) where {Q,R<:AbstractAbsorber,S,U}
     #pack parameters
     param = (A, idx, g, m, fT, fμ)
     #integrate with the ODE solver (appears to be faster than quadrature)
@@ -357,16 +317,14 @@ function stream(dIdx::Q, #version of schwarzschild equation
                 I₀::Real, #initial irradiance
                 x₁::Real, #initial pressure coordinate
                 x₂::Real, #final pressure coordinate
-                A::U,
-                idx::Int, #index for wavenumber and opacity table
+                A::R,
+                idx::Int,
                 g::Real, #gravity [m/s^2]
                 m::Real, #1/cos(θ), where θ is the stream angle
-                fT::R, #temperature profile fT(P)
-                fμ::S, #mean molar mass μ(T,P)
-                tol::Float64 #integrator error tolerance
-                )::Float64 where {Q,R,S,U<:UnifiedAbsorber}
-    #if zero absorption, don't integrate
-    noabsorption(A, idx) && return I₀
+                fT::S, #temperature profile fT(P)
+                fμ::U, #mean molar mass μ(T,P)
+                tol::Real #integrator error tolerance
+                ) where {Q,R<:AbstractAbsorber,S,U}
     #pack parameters
     param = (A, idx, g, m, fT, fμ)
     #integrate the Schwarzschild equation in log pressure coords and return
@@ -377,80 +335,153 @@ function streams(dIdx::Q, #version of schwarzschild equation
                  I₀::Real, #initial irradiance
                  x₁::Real, #initial pressure coordinate
                  x₂::Real, #final pressure coordinate
-                 A::U,
-                 idx::Int, #index for wavenumber and opacity table
+                 A::R,
+                 idx::Int,
                  g::Real, #gravity [m/s^2]
+                 fT::S, #temperature profile fT(P)
+                 fμ::U, #mean molar mass μ(T,P)
                  nstream::Int,
-                 fT::R, #temperature profile fT(P)
-                 fμ::S, #mean molar mass μ(T,P)
-                 tol::Float64 #integrator error tolerance
-                 )::Float64 where {Q,R,S,U<:UnifiedAbsorber}
+                 tol::Real #integrator error tolerance
+                 ) where {Q,R<:AbstractAbsorber,S,U}
     #setup gaussian quadrature nodes
     m, W = streamnodes(nstream)
     #solve schwarzschild w multiple streams, integrating over hemisphere
-    F = 0.0
+    M = zero(I₀)
     for i ∈ 1:nstream
         I = stream(dIdx, I₀, x₁, x₂, A, idx, g, m[i], fT, fμ, tol)
         # integral over hemisphere: ∫∫ I cos(θ) sin(θ) dθ dϕ, where θ∈[0,π/2], ϕ∈[0,2π]
-        F += W[i]*I #W = 2π*w*cos(θ)*sin(θ), precomputed
+        M += W[i]*I #W = 2π*w*cos(θ)*sin(θ), precomputed
     end
-    return F
+    return M
 end
 
 #-------------------------------------------------------------------------------
 # functions for streams and fluxes up/down the atmosphere with in-place storage
 
-function stream!(dIdx::Q, #version of schwarzschild equation
+function stream!(I, #output/solution vector
+                 x, #output/solution coordinates
+                 dIdx::Q, #version of schwarzschild equation
                  I₀::Real, #initial irradiance
-                 I::AbstractVector{Float64}, #output/solution vector
-                 x::Vector{Float64}, #output/solution coordinates
-                 x₁::Real, #initial pressure coordinate
-                 x₂::Real, #final pressure coordinate
-                 A::U,
-                 idx::Int, #index for wavenumber and interpolator
+                 A::R,
+                 idx::Int,
                  g::Real, #gravity [m/s^2]
                  m::Real, #1/cos(θ), where θ is the stream angle
-                 fT::R, #temperature profile fT(P)
-                 fμ::S, #mean molar mass μ(T,P)
-                 tol::Float64 #integrator error tolerance
-                 )::Nothing where {Q,R,S,U<:UnifiedAbsorber}
-    #if zero absorption, don't integrate
-    if noabsorption(A, idx)
-        I .= I₀
-        return nothing
-    end
+                 fT::S, #temperature profile fT(P)
+                 fμ::U, #mean molar mass μ(T,P)
+                 tol::Real #integrator error tolerance
+                 )::Nothing where {Q,R<:AbstractAbsorber,S,U}
     #pack parameters
     param = (A, idx, g, m, fT, fμ)
     #integrate the Schwarzschild equation in log pressure coords, in-place
-    radau!(I, x, dIdx, I₀, x₁, x₂, param, atol=tol, rtol=tol)
+    radau!(I, x, dIdx, I₀, x[1], x[end], param, atol=tol, rtol=tol)
     return nothing
 end
 
-function streams!(dIdx::Q, #version of schwarzschild equation
-                  I₀::Real, #initial irradiance
-                  I, #temporary irradiance vector
-                  F, #output/solution vector
-                  x::Vector{Float64}, #output/solution coordinates
-                  x₁::Real, #initial pressure coordinate
-                  x₂::Real, #final pressure coordinate
-                  A::U,
-                  idx::Int, #index for wavenumber and opacity table
+function streams!(M, #output/solution vector
+                  x, #output/solution coordinates
+                  dIdx::Q, #version of schwarzschild equation
+                  I₀::R, #initial irradiance
+                  A::S,
+                  idx::Int,
                   g::Real, #gravity [m/s^2]
+                  fT::U, #temperature profile fT(P)
+                  fμ::V, #mean molar mass μ(T,P)
                   nstream::Int,
-                  fT::R, #temperature profile fT(P)
-                  fμ::S, #mean molar mass μ(T,P)
-                  tol::Float64 #integrator error tolerance
-                  )::Nothing where {Q,R,S,U<:UnifiedAbsorber}
-    @assert length(I) == length(F) == length(x)
+                  tol::Real #integrator error tolerance
+                  )::Nothing where {Q,R<:Real,S<:AbstractAbsorber,U,V}
+    @assert length(M) == length(x)
+    L = length(M)
     #setup gaussian quadrature nodes
     m, W = streamnodes(nstream)
+    #temporary irradiance vector
+    I = Vector{R}(undef,L) #allocating shouldn't usually be that costly, overall
     #solve schwarzschild w multiple streams, integrating over hemisphere
     for i ∈ 1:nstream
-        stream!(dIdx, I₀, I, x, x₁, x₂, A, idx, g, m[i], fT, fμ, tol)
+        stream!(I, x, dIdx, I₀, A, idx, g, m[i], fT, fμ, tol)
         # integral over hemisphere: ∫∫ I cos(θ) sin(θ) dθ dϕ, where θ∈[0,π/2], ϕ∈[0,2π]
-        for j ∈ eachindex(F)
-            @inbounds F[j] += W[i]*I[j] #W = 2π*w*cos(θ)*sin(θ), precomputed
+        for j ∈ eachindex(M)
+            @inbounds M[j] += W[i]*I[j] #W = 2π*w*cos(θ)*sin(θ), precomputed
         end
     end
     return nothing
+end
+
+#-------------------------------------------------------------------------------
+# core function for whole atmosphere upward and downward monochromatic fluxes
+
+export monochromaticfluxes!
+
+function monochromaticfluxes!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
+                              M⁺, 
+                              P, #pressure coordinates of output
+                              A::Q,
+                              idx::Int,
+                              g::Real, #gravity [m/s^2]
+                              fT::R, #temperature profile fT(P)
+                              fμ::S, #mean molar mass μ(T,P)
+                              fS::U, #incoming stellar radiation fS(ν) [W/m^2]
+                              fα::V, #surface albedo fα(ν)
+                              nstream::Int=5, #number of streams to integrate in both directions
+                              θₛ::Real=0.841, #stellar radiation angle, corresponds to cos(θ) = 2/3
+                              tol::Real=1e-4
+                              ) where {Q<:AbstractAbsorber,R,S,U,V}
+    @assert length(M⁻) == length(M⁺) == length(P)
+    #surface pressure assuming ascending pressures
+    Pₛ = P[end]
+    #surface temperature
+    Tₛ = fT(Pₛ)
+    #wavenumber
+    ν = A.ν[idx]
+    #angle factor for incoming stellar radiation
+    m = 1/cos(θₛ)
+    #downward stellar irradiance at ν
+    Iₜ⁻ = fS(ν)
+    #transformed pressure coordinates
+    ω = P2ω.(P)
+    reverse!(ω)
+    ι = P2ι.(P)
+    #downward stellar irradiance throughout atmosphere
+    stream!(M⁻, ι, dIdι, Iₜ⁻, A, idx, g, m, fT, fμ, tol)
+    #convert to flux
+    M⁻ .*= cos(θₛ)
+    #add the atmospheric contribution to downward flux
+    streams!(M⁻, ι, dIdι, zero(Iₜ⁻), A, idx, g, fT, fμ, nstream, tol)
+    #some of the downward stellar flux is reflected
+    Iₛ⁺ = M⁻[end]*fα(ν)/π #Lambertian
+    #and the surface emits some radiation
+    Iₛ⁺ += planck(ν, Tₛ)
+    #upward radiation streams
+    streams!(M⁺, ω, dIdω, Iₛ⁺, A, idx, g, fT, fμ, nstream, tol)
+    #reverse the upward flux to match the coordinate ordering of P and ι
+    reverse!(M⁺)
+
+    nothing
+end
+
+export monochromaticfluxes
+
+function monochromaticfluxes(P, #pressure coordinates of output
+                             A::Q, #AbstractAbsorber
+                             g::Real, #gravity [m/s^2]
+                             fT::R, #temperature profile fT(P)
+                             fμ::S, #mean molar mass μ(T,P)
+                             fS::U, #incoming stellar radiation fS(ν) [W/m^2]
+                             fα::V, #surface albedo fα(ν)
+                             nstream::Int=5, #number of streams to integrate in both directions
+                             θₛ::Real=0.841, #stellar radiation angle, corresponds to cos(θ) = 2/3
+                             tol::Real=1e-4
+                             ) where {Q<:AbstractAbsorber,R,S,U,V}
+    #allocate space for results
+    M⁻ = zeros(length(P), length(A.ν))
+    M⁺ = zeros(length(P), length(A.ν))
+    #asynchronous execution 'cause spectrally variable optical depth
+    tasks = Vector{Task}(undef, A.nν)
+    for i ∈ eachindex(A.ν)
+        Mᵥ⁻ = view(M⁻,:,i)
+        Mᵥ⁺ = view(M⁺,:,i)
+        tasks[i] = @spawn monochromaticfluxes!(Mᵥ⁻, Mᵥ⁺, P, A, i, g, fT, fμ, fS, fα, nstream, θₛ, tol)
+    end
+    [fetch(task) for task ∈ tasks]
+
+    return M⁻, M⁺
 end

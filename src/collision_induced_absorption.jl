@@ -3,14 +3,14 @@
 
 export readcia, CIATables
 
-function nextspace(s::String, i::Int, L::Int)::Int
+function nextspace(s::String, i::Int, L::Int)
     while (i <= L) && (s[i] != ' ')
         i += 1
     end
     return i
 end
 
-function nextnonspace(s::String, i::Int, L::Int)::Int
+function nextnonspace(s::String, i::Int, L::Int)
     while (i <= L) && (s[i] == ' ')
         i += 1
     end
@@ -136,10 +136,10 @@ A `CIATables` can be passed to the [`cia`](@ref) function to compute an absorpti
 co2ch4 = CIATables("data/cia/CO2-CH4_2018.cia"); #read data
 ν = 250; #wavenumber [cm^-1]
 T = 310 #temperature [K]
-Pair = 1e5; #air pressure [Pa]
+Pa = 1e5; #air pressure [Pa]
 Pco2 = 40; #CO2 partial pressure [Pa]
 Pch4 = 0.1; #CH4 partial pressure [Pa]
-σ = cia(ν, co2ch4, T, Pair, Pco2, Pch4) #absorption cross-section [cm^2/molecule]
+σ = cia(ν, co2ch4, T, Pa, Pco2, Pch4) #absorption cross-section [cm^2/molecule]
 ```
 """
 struct CIATables
@@ -162,9 +162,7 @@ function CIATables(data::Vector{Dict{String,Any}};
                    extrapolate::Bool=false,
                    singles::Bool=false,
                    verbose::Bool=true)
-    if verbose
-        println("creating CIATables")
-    end
+    verbose && println("creating CIATables")
     #pull out wavenumber ranges and temperatures for each grid
     νmin = map(x->x["νmin"], data)
     νmax = map(x->x["νmax"], data)
@@ -246,8 +244,8 @@ end
 #-------------------------------------------------------------------------------
 # interpolating k, the raw CIA values
 
-function (tables::CIATables)(ν, T)::Float64
-    k = 0.0
+function (tables::CIATables)(ν, T)
+    k = zero(T)
     #look at each grid
     for Φ ∈ tables.Φ
         if Φ.G.xa <= ν <= Φ.G.xb
@@ -293,7 +291,7 @@ Compute a collision induced absorption cross-section
 * `P₁`: partial pressure of first gas [Pa]
 * `P₂`: partial pressure of second gas [Pa]
 """
-function cia(k, T, Pₐ, P₁, P₂)::Float64
+function cia(k, T, Pₐ, P₁, P₂)
     #number densities of gases, in amagats
     ρ₁ = (P₁/𝐀)*(𝐓₀/T)
     ρ₂ = (P₂/𝐀)*(𝐓₀/T)
@@ -316,7 +314,7 @@ Compute a collision induced absorption cross-section after retrieving the total 
 * `P₁`: partial pressure of first gas [Pa]
 * `P₂`: partial pressure of second gas [Pa]
 """
-function cia(ν::Real, x::CIATables, T, Pₐ, P₁, P₂)::Float64
+function cia(ν::Real, x::CIATables, T, Pₐ, P₁, P₂)
     #first retrieve the absorption coefficient from the interpolator
     k = x(ν, T) #cm^5/molecule^2
     #then compute the cross-section
@@ -340,7 +338,7 @@ Compute a vector of collision induced absorption cross-sections in-place, retrie
 function cia!(σ::AbstractVector, ν::AbstractVector, x::CIATables, T, Pₐ, P₁, P₂)
     @assert length(σ) == length(ν)
     for i = 1:length(σ)
-        σ[i] += cia(ν[i], x, T, P₁, P₂, Pₐ)
+        @inbounds σ[i] += cia(ν[i], x, T, P₁, P₂, Pₐ)
     end
 end
 
@@ -357,14 +355,14 @@ Compute a vector of collision induced absorption cross-sections, retrieving the 
 * `P₁`: partial pressure of first gas [Pa]
 * `P₂`: partial pressure of second gas [Pa]
 """
-function cia(ν::AbstractVector, x::CIATables, T, Pₐ, P₁, P₂)::Vector{Float64}
+function cia(ν::AbstractVector, x::CIATables, T, Pₐ, P₁, P₂)
     σ = zeros(Float64, length(ν))
     cia!(σ, ν, x, T, P₁, P₂, Pₐ)
     return σ
 end
 
 """
-    cia(ν, x::CIATables, T, Pₐ, g₁::AbstractGas, g₂::AbstractGas)
+    cia(ν, x::CIATables, T, Pₐ, g₁::Gas, g₂::Gas)
 
 Compute a collision induced absorption cross-section, retrieving the total absorption coefficient from a [`CIATables`](@ref) object and computing partial pressures from gas objects.
 
@@ -376,7 +374,7 @@ Compute a collision induced absorption cross-section, retrieving the total absor
 * `g₁`: gas object representing the first component of the CIA pair
 * `g₂`: gas object representing the second component of the CIA pair
 """
-function cia(ν::Real, x::CIATables, T, Pₐ, g₁::AbstractGas, g₂::AbstractGas)::Float64
+function cia(ν::Real, x::CIATables, T, Pₐ, g₁::Gas, g₂::Gas)
     P₁ = Pₐ*concentration(g₁, T, Pₐ)
     P₂ = Pₐ*concentration(g₂, T, Pₐ)
     cia(ν, x, T, Pₐ, P₁, P₂)
@@ -395,12 +393,12 @@ Container for a [`CIATables`](@ref) object and the two gasses representing the C
 | `name` | `String` | molecular symbol, i.e. `"CO2-H2"` |
 | `formulae` | `Tuple{String,String}` | split molecular formulae, i.e `("CO2", "H2")` |
 | `x` | `CIATables` | collision induced absorption tables |
-| `g₁` | `<:AbstractGas` | first component of CIA pair |
-| `g₁` | `<:AbstractGas` | second component of CIA pair |
+| `g₁` | `<:Gas` | first component of CIA pair |
+| `g₁` | `<:Gas` | second component of CIA pair |
 
 # Constructors
 
-    CIA(ciatables::CIATables, g₁::AbstractGas, g₂::AbstractGas)
+    CIA(ciatables::CIATables, g₁::Gas, g₂::Gas)
 
 The name and formulae are taken from `ciatables`.
 
@@ -415,9 +413,9 @@ A `CIA` object is [function-like](https://docs.julialang.org/en/v1/manual/method
 ```julia
 #load gases
 ν = LinRange(1, 2500, 2500);
-Ω = AtmosphericDomain();
-co2 = BulkGas("data/par/CO2.par", 0.96, ν, Ω);
-ch4 = MinorGas("data/par/CH4.par", 1e-6, ν, Ω);
+Ω = AtmosphericDomain((100,350), 8, (0.9,2e5), 16);
+co2 = WellMixedGas("data/par/CO2.par", 0.96, ν, Ω);
+ch4 = WellMixedGas("data/par/CH4.par", 1e-6, ν, Ω);
 
 #create CIA object
 co2ch4 = CIA(CIATables("data/cia/CO2-CH4_2018.cia"), co2, ch4);
@@ -437,13 +435,13 @@ struct CIA{T,U}
     g₂::U
 end
 
-function CIA(ciatables::CIATables, g₁::AbstractGas, g₂::AbstractGas)
+function CIA(ciatables::CIATables, g₁::Gas, g₂::Gas)
     @assert g₁.formula in ciatables.formulae "gas $(g₁.formula) not found in $(ciatables.name) CIATables"
     @assert g₂.formula in ciatables.formulae "gas $(g₂.formula) not found in $(ciatables.name) CIATables"
     CIA(ciatables.name, ciatables.formulae, ciatables, g₁, g₂)
 end
 
-function findgas(f::String, cianame::String, gases::AbstractGas...)
+function findgas(f::String, cianame::String, gases::Gas...)
     idx = findall(g -> g.formula == f, gases)
     @assert length(idx) > 0 "pairing failed for $cianame CIA, gas $f is missing"
     @assert length(idx) == 1 "pairing failed for $cianame CIA, duplicate $f gases found"
@@ -459,4 +457,4 @@ function CIA(ciatables::CIATables, gases::Tuple)
     CIA(ciatables, g₁, g₂)
 end
 
-(χ::CIA)(ν, T, P)::Float64 = cia(ν, χ.x, T, P, χ.g₁, χ.g₂)
+(χ::CIA)(ν, T, P) = cia(ν, χ.x, T, P, χ.g₁, χ.g₂)

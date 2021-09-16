@@ -59,21 +59,21 @@ end
 #-------------------------------------------------------------------------------
 # Chebyshev polynomial fit for Qref/Q
 
-function chebyQrefQ(T::Real, n::Int64, a::Vector{Float64})::Float64
+function chebyQrefQ(T::Real, n::Int64, a::Vector{Float64})
     #check the temperature range
-    @assert TMIN <= T <= TMAX "temperature outside of Qref/Q interpolation range"
+    @assert TMIN <= T <= TMAX "temperature outside of Qref/Q interpolation range [$TMIN, $TMAX]"
     #map T to [-1,1]
     τ::Float64 = 2*(T - TMIN)/(TMAX - TMIN) - 1
     #values of first two chebys at τ
     c₁::Float64 = 1.0
     c₂::Float64 = τ
     #value of expansion after first two terms
-    y = a[1] + a[2]*c₂
-    @inbounds for k = 3:n
+    @inbounds y = a[1] + a[2]*c₂
+    for k = 3:n
         #next cheby value
         c₃::Float64 = 2*τ*c₂ - c₁
         #contribute to expansion
-        y += a[k]*c₃
+        @inbounds y += a[k]*c₃
         #swap values
         c₁ = c₂
         c₂ = c₃
@@ -139,7 +139,7 @@ Compute the [temperature scaling for line intensity](https://hitran.org/docs/def
 * `I`: [HITRAN local isotopologue number](https://hitran.org/docs/iso-meta/)
 * `T`: temperature [K]
 """
-function scaleintensity(S, νl, Epp, M::Int16, I::Int16, T)::Float64
+function scaleintensity(S, νl, Epp, M::Int16, I::Int16, T)
     #arguments to exp
     a = -c2*Epp
     b = -c2*νl
@@ -176,7 +176,7 @@ export αdoppler, fdoppler, doppler, doppler!
 
 Compute doppler (gaussian) broadening coefficient from line wavenumber `νl` [cm``^{-1}``], gas molar mass `μ` [kg/mole], and temperature `T` [K].
 """
-αdoppler(νl, μ, T)::Float64 = (νl/𝐜)*sqrt(2.0*𝐑*T/μ)
+αdoppler(νl, μ, T) = (νl/𝐜)*sqrt(2.0*𝐑*T/μ)
 
 function αdoppler(sl::SpectralLines, i::Vector{Int64}, T)::Vector{Float64}
     αdoppler.(view(sl.ν,i), view(sl.μ,i), T)
@@ -192,7 +192,7 @@ Evaluate doppler (gaussian) profile
 * `νl`: wavenumber of absorption line [cm``^{-1}``]
 * `α`: doppler (gaussian) broadening coefficient
 """
-fdoppler(ν, νl, α)::Float64 = exp(-(ν - νl)^2/α^2)/(α*sqπ)
+fdoppler(ν, νl, α) = exp(-(ν - νl)^2/α^2)/(α*sqπ)
 
 """
     doppler(ν, νl, S, α)
@@ -205,7 +205,7 @@ Evaluate doppler (gaussian) absoption cross-section [cm``^2``/molecule]
 * `S`: line absoption intensity [cm``^{-1}``/(molecule``\\cdot``cm``^{-2}``)]
 * `α`: doppler (gaussian) broadening coefficient
 """
-doppler(ν, νl, S, α)::Float64 = S*fdoppler(ν, νl, α)
+doppler(ν, νl, S, α) = S*fdoppler(ν, νl, α)
 
 """
     doppler(ν, sl, T, P, Pₚ, Δνcut=25)
@@ -220,7 +220,7 @@ Evaluate a single doppler (gaussian) absoption cross-section [cm``^2``/molecule]
 * `Pₚ`: partial pressure [Pa]
 * `Δνcut`: profile truncation distance [cm``^{-1}``]
 """
-function doppler(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)::Float64
+function doppler(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)
     i = includedlines(ν, sl.ν, Δνcut)
     S = scaleintensity(sl, i, T)
     α = αdoppler(sl, i, T)
@@ -287,7 +287,7 @@ Compute lorentzian broadening coefficient
 * `P`: air pressure [Pa]
 * `Pₚ`: partial pressure [Pa]
 """
-function γlorentz(γa, γs, na, T, P, Pₚ)::Float64
+function γlorentz(γa, γs, na, T, P, Pₚ)
     ((𝐓ᵣ/T)^na)*(γa*(P - Pₚ) + γs*Pₚ)/𝐀
 end
 
@@ -305,7 +305,7 @@ Evaluate lorentz profile
 * `νl`: wavenumber of absorption line [cm``^{-1}``]
 * `γ`: lorentzian broadening coefficient
 """
-florentz(ν, νl, γ)::Float64 = γ/(π*((ν - νl)*(ν - νl) + γ*γ))
+florentz(ν, νl, γ) = γ/(π*((ν - νl)*(ν - νl) + γ*γ))
 
 """
     lorentz(ν, νl, S, γ)
@@ -318,7 +318,7 @@ Evaluate lorentzian absoption cross-section [cm``^2``/molecule]
 * `S`: line absoption intensity [cm``^{-1}``/(molecule``\\cdot``cm``^{-2}``)]
 * `γ`: lorentzian broadening coefficient
 """
-lorentz(ν, νl, S, γ)::Float64 = S*florentz(ν, νl, γ)
+lorentz(ν, νl, S, γ) = S*florentz(ν, νl, γ)
 
 """
     lorentz(ν, sl, T, P, Pₚ, Δνcut=25)
@@ -333,7 +333,7 @@ Compute a single lorentzian absorption cross-sections [cm``^2``/molecule] from a
 * `Pₚ`: partial pressure [Pa]
 * `Δνcut`: profile truncation distance [cm``^{-1}``]
 """
-function lorentz(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)::Float64
+function lorentz(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)
     i = includedlines(ν, sl.ν, Δνcut)
     S = scaleintensity(sl, i, T)
     γ = γlorentz(sl, i, T, P, Pₚ)
@@ -398,7 +398,7 @@ Evaluate Voigt profile
 * `α`: doppler (gaussian) broadening coefficient
 * `γ`: lorentzian broadening coefficient
 """
-function fvoigt(ν, νl, α, γ)::Float64
+function fvoigt(ν, νl, α, γ)
     #inverse of the doppler parameter
     β = 1/α
     #factor for real and complex parts of Faddeeva args, avoiding β division
@@ -424,14 +424,14 @@ Evaluate Voigt absoption cross-section [cm``^2``/molecule]
 * `α`: doppler (gaussian) broadening coefficient
 * `γ`: lorentzian broadening coefficient
 """
-voigt(ν, νl, S, α, γ)::Float64 = S*fvoigt(ν, νl, α, γ)
+voigt(ν, νl, S, α, γ) = S*fvoigt(ν, νl, α, γ)
 
 """
     voigt(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25)
 
 Evaluate Voigt absorption cross-section at a single wavenumber.
 """
-function voigt(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)::Float64
+function voigt(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=25.0)
     i = includedlines(ν, sl.ν, Δνcut)
     S = scaleintensity(sl, i, T)
     α = αdoppler(sl, i, T)
@@ -499,7 +499,7 @@ Compute the `Χ` (Chi) factor for sub-lorentzian CO2 line profiles, as in
 * `νl`: wavenumber of absorption line [cm``^{-1}``]
 * `T`: temperature [K]
 """
-function ΧPHCO2(ν, νl, T)::Float64
+function ΧPHCO2(ν, νl, T)
     Δν = abs(ν - νl)
     if Δν < 3.0
         return 1.0
@@ -528,7 +528,7 @@ Evaluate Perrin & Hartman sub-lorentzian absoption cross-section [cm``^2``/molec
 * `α`: doppler (gaussian) broadening coefficient
 * `γ`: lorentzian broadening coefficient
 """
-function PHCO2(ν, νl, T, S, α, γ)::Float64
+function PHCO2(ν, νl, T, S, α, γ)
     Χ = ΧPHCO2(ν, νl, T)
     voigt(ν, νl, S, α, Χ*γ)
 end
@@ -546,7 +546,7 @@ Compute a single Perrin & Hartman sub-lorentzian CO2 absorption cross-sections [
 * `Pₚ`: partial pressure [Pa]
 * `Δνcut`: profile truncation distance [cm``^{-1}``]
 """
-function PHCO2(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=500.0)::Float64
+function PHCO2(ν, sl::SpectralLines, T, P, Pₚ, Δνcut=500.0)
     i = includedlines(ν, sl.ν, Δνcut)
     S = scaleintensity(sl, i, T)
     α = αdoppler(sl, i, T)

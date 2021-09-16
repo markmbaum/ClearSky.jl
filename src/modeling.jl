@@ -31,15 +31,14 @@ function opticaldepth(P₁::Real,
     P₁, P₂ = max(P₁, P₂), min(P₁, P₂)
     A = unifyabsorbers(absorbers)
     checkpressures(A, P₁, P₂)
+    ν, _ = A.ν, A.nν
+    ω₁, ω₂ = P2ω(P₁), P2ω(P₂)
     checkazimuth(θ)
-    #integrate wavenumbers in parallel
-    τ = zeros(Float64, A.nν)
     m = 1/cos(θ)
-    @threads for i ∈ eachindex(A.ν)
-        #integrate
-        τ[i] = depth(dτdω, P2ω(P₁), P2ω(P₂), A, i, g, m, fT, fμ, tol)
-    end
-    return τ
+    #spawn integrations in parallel, dynamic schedule
+    tasks = [@spawn depth(dτdω, ω₁, ω₂, A, i, g, m, fT, fμ, tol) for i ∈ eachindex(ν)]
+    #fetch the results
+    [fetch(task) for task ∈ tasks]
 end
 
 #-------------------------------------------------------------------------------
@@ -81,110 +80,28 @@ function outgoing(Pₛ::Real,
                   fT::Q,
                   fμ::R,
                   absorbers...;
-                  Pₜ::Float64=1.0, #top of atmosphere pressure, 1 Pa by default
-                  nstream::Int64=5, #number of streams to use
-                  tol::Float64=1e-5 #integrator tolerance
-                  )::Vector{Float64} where {Q,R}
+                  Pₜ::Real=1.0, #top of atmosphere pressure, 1 Pa by default
+                  nstream::Int=5, #number of streams to use
+                  tol::Real=1e-5 #integrator tolerance
+                  ) where {Q,R}
     #initialization
     A = unifyabsorbers(absorbers)
+    ν, nν = A.ν, A.nν
     checkpressures(A, Pₛ, Pₜ)
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
     #surface temperature
     T₀ = fT(Pₛ)
-    #integrate wavenumbers in parallel
-    F = zeros(Float64, A.nν)
-    @threads for i ∈ eachindex(A.ν)
-        I₀ = planck(A.ν[i], T₀)
-        F[i] = streams(dIdω, I₀, ω₁, ω₂, A, i, g, nstream, fT, fμ, tol)
+    #integrate in parallel, dynamic schedule
+    tasks = Vector{Task}(undef, nν)
+    for (i,νᵢ) ∈ enumerate(ν)
+        I₀ = planck(νᵢ, T₀)
+        tasks[i] = @spawn streams(dIdω, I₀, ω₁, ω₂, A, i, g, fT, fμ, nstream, tol)
     end
-    return F
+    [fetch(task) for task ∈ tasks]
 end
 
 #-------------------------------------------------------------------------------
-export topflux, surfaceflux
-
-function topflux(Pₛ::Real,
-                 g::Real,
-                 fT::Q, # fT(P)
-                 fμ::R, # fμ(T,P)
-                 fS::S, # fS(ν) [W/m^2]
-                 fα::U, #albedo as function of wavenumber
-                 absorbers...;
-                 Pₜ::Float64=1.0, #top of atmosphere pressure, 1 Pa by default
-                 nstream::Int64=5, #number of streams to use
-                 θₛ::Float64=0.841, #corresponds to cos(θ) = 2/3
-                 tol::Float64=1e-4
-                 )::NTuple{2,Vector{Float64}} where {Q,R,S,U}
-    #setup
-    A = unifyabsorbers(absorbers)
-    checkpressures(A, Pₛ, Pₜ)
-    checkazimuth(θₛ)
-    ν, nν = A.ν, A.nν
-    ω₁, ω₂ = P2ω(Pₛ, Pₜ)
-    ι₁, ι₂ = P2ι(Pₜ, Pₛ)
-
-    Tₛ = fT(Pₛ) #surface temperature
-    Fₜ⁻ = fS.(ν)*cos(θₛ) #incoming stellar flux at TOA
-    Fₛ⁻ = zeros(nν) #downward stellar flux at the ground/surface
-    Fₜ⁺ = zeros(nν) #outgoing flux at TOA
-    m = 1/cos(θₛ)
-
-    @threads for i ∈ eachindex(ν)
-        #downward stellar flux at surface
-        τ = depth(dτdι, ι₁, ι₂, A, i, g, m, fT, fμ, tol)
-        Fₛ⁻[i] = Fₜ⁻[i]*exp(-τ)
-        #some of it gets reflected back upward at the surface
-        Iₛ⁺ = Fₛ⁻[i]*fα(ν[i])/π #Lambertian reflection
-        #then radiation streams out of the atmosphere
-        I₀ = Iₛ⁺ + planck(ν[i], Tₛ)
-        Fₜ⁺[i] = streams(dIdω, I₀, ω₁, ω₂, A, i, g, nstream, fT, fμ, tol)
-    end
-
-    return Fₜ⁻, Fₜ⁺
-end
-
-function surfaceflux(Pₛ::Real,
-                     g::Real,
-                     fT::Q, # fT(P)
-                     fμ::R, # fμ(T,P)
-                     fS::S, # fS(ν) [W/m^2]
-                     fα::U, #albedo as function of wavenumber
-                     absorbers...;
-                     Pₜ::Float64=1.0, #top of atmosphere pressure, 1 Pa by default
-                     nstream::Int64=5, #number of streams to use
-                     θₛ::Float64=0.841, #corresponds to cos(θ) = 2/3
-                     tol::Float64=1e-4
-                     )::NTuple{2,Vector{Float64}} where {Q,R,S,U}
-    #setup
-    A = unifyabsorbers(absorbers)
-    checkpressures(A, Pₛ, Pₜ)
-    checkazimuth(θₛ)
-    ν, nν = A.ν, A.nν
-    ι₁, ι₂ = P2ι(Pₜ, Pₛ)
-
-    Tₛ = fT(Pₛ) #surface temperature
-    Fₜ⁻ = fS.(ν)*cos(θₛ) #incoming stellar flux at TOA
-    Fₛ⁻ = zeros(nν) #downward flux at the ground/surface
-    Fₛ⁺ = zeros(nν) #upward flux at surface
-    m = 1/cos(θₛ)
-    
-    @threads for i ∈ eachindex(ν)
-        #incoming stellar flux at surface
-        τ = depth(dτdι, ι₁, ι₂, A, i, g, m, fT, fμ, tol)
-        Fₛ⁻[i] += Fₜ⁻[i]*exp(-τ)
-        #some of it gets reflected back upward at the surface
-        Fₛ⁺[i] = Fₛ⁻[i]*fα(ν[i])
-        #and the surface emits some radiation
-        Fₛ⁺[i] += π*planck(ν[i], Tₛ)
-        #the atmosphere emits downward too
-        Fₛ⁻[i] += streams(dIdι, 0.0, ι₁, ι₂, A, i, g, nstream, fT, fμ, tol)
-    end
-
-    return Fₛ⁻, Fₛ⁺
-end
-
-#-------------------------------------------------------------------------------
-export netflux
+export netflux, heating
 
 function netflux(P::AbstractVector{<:Real},
                  g::Real,
@@ -193,57 +110,73 @@ function netflux(P::AbstractVector{<:Real},
                  fS::S,
                  fα::U,
                  absorbers...;
-                 nstream::Int64=5,
+                 nstream::Int=5,
                  θₛ::Float64=0.841,
                  tol::Float64=1e-5
                  )::Vector{Float64} where {Q,R,S,U}
     #setup
     A = unifyabsorbers(absorbers)
-    @assert P[end] < P[1] "pressure coordinates must be in descending order"
+    #use ascending pressure coordinates
+    idx = sortperm(P)
+    P = P[idx]
     checkpressures(A, P[1], P[end])
-    P = reverse(collect(Float64, P))
-    nP = length(P)
+    np = length(P)
     checkazimuth(θₛ)
     ν, nν = A.ν, A.nν
-    ω = reverse(P2ω.(P))
-    ι = P2ι.(P)
  
-    #temporary storage
-    X = zeros(Float64, nP, nthreads())
-    #surface temperature
-    Tₛ = fT(maximum(P)) #surface temperature
-    #angle factor for incoming stellar light
-    m = 1/cos(θₛ)
     #big blocks of flux
-    M⁺ = zeros(Float64, nP, nν) #monochromatic upward fluxes
-    M⁻ = zeros(Float64, nP, nν) #monochromatic downward fluxes
-    Fₙ = zeros(Float64, nP) #net fluxes
-    
-    for i ∈ eachindex(ν)
-        #temporary storage
-        x = @view X[:,threadid()]
-        #downward stellar irradiance
-        I₀ = fS(ν[i])
-        #downward stellar irradiance through atmosphere
-        M = @view M⁻[:,i]
-        stream!(dIdι, I₀, M, ι, ι[1], ι[end], A, i, g, m, fT, fμ, tol)
-        M .*= cos(θₛ) #convert to flux
-        #some of the stellar flux is reflected
-        Iₛ⁺ = M[end]*fα(ν[i])/π #Lambertian reflection
-        #and the surface emits radiation
-        I₀ = Iₛ⁺ + planck(ν[i], Tₛ)
-        #total upward radiation streams
-        M = @view M⁺[nP:-1:1,i] #reversed view, from surface to TOA
-        streams!(dIdω, I₀, x, M, ω, ω[1], ω[end], A, i, g, nstream, fT, fμ, tol)
-        #downward atmospheric contribution
-        M = @view M⁻[:,i]
-        streams!(dIdι, 0.0, x, M, ι, ι[1], ι[end], A, i, g, nstream, fT, fμ, tol)
+    M⁺ = zeros(np, nν) #monochromatic upward fluxes
+    M⁻ = zeros(np, nν) #monochromatic downward fluxes
+    #asynchronous, parallel integrations
+    tasks = Vector{Task}(undef, A.nν)
+    for i ∈ eachindex(A.ν)
+        Mᵥ⁻ = view(M⁻,:,i)
+        Mᵥ⁺ = view(M⁺,:,i)
+        tasks[i] = @spawn monochromaticfluxes!(Mᵥ⁻, Mᵥ⁺, P, A.β[i], g, fT, fμ, fS, fα, nstream, θₛ, tol)
     end
+    [fetch(task) for task ∈ tasks]
 
+    Fₙ = zeros(np)
     @threads for i ∈ eachindex(P)
-        Fₙ[i] = trapz(ν, @view M⁺[i,:]) - trapz(ν, @view M⁻[i,:])
+        #the upward flux order must be reversed to match
+        Mᵥ⁺ = @view M⁺[np-i+1,:]
+        #downward fluxes are already in the same order as P
+        Mᵥ⁻ = @view M⁻[i,:]
+        #take the difference of total flux at each level
+        Fₙ[i] = trapz(ν, Mᵥ⁺) - trapz(ν, Mᵥ⁻)
     end
 
-    return reverse(Fₙ)
+    return Fₙ[sortperm(idx)]
 end
-    
+
+function heating(P::AbstractVector{<:Real},
+                 g::Real,
+                 fT::Q,
+                 fμ::R,
+                 fS::S,
+                 fα::U,
+                 fcₚ::V, #heat capacity cₚ(T,P) [J/kg/K]
+                 absorbers...;
+                 kwargs...
+                 )::Vector{Float64} where {Q,R,S,U,V}
+    #get pressures sorted in ascending order
+    idx = sortperm(P)
+    P = P[idx]
+    #insert points for high-accuracy finite differences
+    Φ, δ = insertdiff(P)
+    #compute the net fluxes
+    Fₙ = netflux(Φ, g, fT, fμ, fS, fα, absorbers...; kwargs...)
+    #take dFₙ/dP
+    ∂ = evaldiff(Fₙ, δ)
+    #apply thermodynamical properties
+    H = zeros(Float64, length(∂))
+    for i ∈ eachindex(∂)
+        #atmospheric temperature
+        T = fT(P[i])
+        #heat capacity
+        cₚ = fcₚ(T,P[i])
+        #heating rate [Kelvin/s]
+        H[i] = ∂[i]*(g/cₚ)
+    end
+    return H[sortperm(idx)]
+end

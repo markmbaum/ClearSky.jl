@@ -1,18 +1,12 @@
 export readpar, SpectralLines
 
-"""
-Mapping between single character isotopologue codes and isotopologue numbers. This is only relevant for molecules with many isotopologues, like CO2. The isotopologue code is only alloted 1 column in the fixed width .par files, so capital letters are used after 0-9 are exhausted. For example, the 11th isotopologue of CO2 in the HITRAN database is coded 'A' and the 12th is coded 'B'.
-"""
-const ISOINDEX = Dict(
-    '1'=>1,  '2'=>2,  '3'=>3,  '4'=>4,
-    '5'=>5,  '6'=>6,  '7'=>7,  '8'=>8,
-    '9'=>9,  '0'=>10, 'A'=>11, 'B'=>12,
-    'C'=>13, 'D'=>14, 'E'=>15, 'F'=>16,
-    'G'=>17, 'H'=>18, 'I'=>19, 'J'=>20,
-    'K'=>21, 'L'=>22, 'M'=>23, 'N'=>24,
-    'O'=>25, 'P'=>26, 'Q'=>27, 'R'=>28,
-    'S'=>29, 'T'=>30, 'U'=>31, 'V'=>32,
-    'W'=>33, 'X'=>34, 'Y'=>35, 'Z'=>36
+const ISOINDEX = Dict{Char,Int64}(
+    '1'=>1,  '2'=>2,  '3'=>3,  '4'=>4,  '5'=>5,  '6'=>6,
+    '7'=>7,  '8'=>8,  '9'=>9,  '0'=>10, 'A'=>11, 'B'=>12,
+    'C'=>13, 'D'=>14, 'E'=>15, 'F'=>16, 'G'=>17, 'H'=>18,
+    'I'=>19, 'J'=>20, 'K'=>21, 'L'=>22, 'M'=>23, 'N'=>24,
+    'O'=>25, 'P'=>26, 'Q'=>27, 'R'=>28, 'S'=>29, 'T'=>30,
+    'U'=>31, 'V'=>32, 'W'=>33, 'X'=>34, 'Y'=>35, 'Z'=>36
 )
 
 """
@@ -65,17 +59,17 @@ function readpar(filename::String;
     lines = readlines(filename)
     N = length(lines)
     #hard code the format to make sure nothing slows it down ¯\_(ツ)_/¯
-    par = Dict{String,Vector}(
-        "M"   =>Vector{Int16}(undef, N),
+    par = Dict(
+        "M"   =>zeros(Int16, N),
         "I"   =>Vector{Char}(undef, N),
-        "ν"   =>Vector{Float64}(undef, N),
-        "S"   =>Vector{Float64}(undef, N),
-        "A"   =>Vector{Float64}(undef, N),
-        "γa"  =>Vector{Float64}(undef, N),
-        "γs"  =>Vector{Float64}(undef, N),
-        "Epp" =>Vector{Float64}(undef, N),
-        "na"  =>Vector{Float64}(undef, N),
-        "δa"  =>Vector{Float64}(undef, N),
+        "ν"   =>zeros(Float64, N),
+        "S"   =>zeros(Float64, N),
+        "A"   =>zeros(Float64, N),
+        "γa"  =>zeros(Float64, N),
+        "γs"  =>zeros(Float64, N),
+        "Epp" =>zeros(Float64, N),
+        "na"  =>zeros(Float64, N),
+        "δa"  =>zeros(Float64, N),
         "Vp"  =>Vector{String}(undef, N),
         "Vpp" =>Vector{String}(undef, N),
         "Qp"  =>Vector{String}(undef, N),
@@ -86,10 +80,11 @@ function readpar(filename::String;
         "gp"  =>Vector{String}(undef, N),
         "gpp" =>Vector{String}(undef, N)
     )
+    #parse the values 
     if progress
         prg = Progress(length(lines), 0.1, "Parsing \"$(splitdir(filename)[end])\" ")
     end
-    @inbounds for i in eachindex(lines)
+    @inbounds for i ∈ eachindex(lines)
         #get the line in question
         line = lines[i]
         #parse all the fields

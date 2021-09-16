@@ -1,5 +1,20 @@
+#-------------------------------------------------------------------------------
+#log coordinates are handy
+
+#upward calculations
+P2ω(P) = -log(P)
+ω2P(ω) = exp(-ω)
+P2ω(Pₛ, Pₜ) = P2ω(Pₛ), P2ω(Pₜ)
+
+#downward calculations
+P2ι(P) = log(P)
+ι2P(ι) = exp(ι)
+P2ι(Pₜ, Pₛ) = P2ι(Pₜ), P2ι(Pₛ)
+
+#-------------------------------------------------------------------------------
+
 export trapz
-function trapz(x::AbstractVector, y::AbstractVector)::Float64
+function trapz(x::AbstractVector, y::AbstractVector)
     @assert length(x) == length(y) "vectors must be equal length"
     s = 0.0
     for i = 1:length(x) - 1
@@ -16,7 +31,7 @@ function meshgrid(x::AbstractVector, y::AbstractVector)
 end
 
 export logrange
-function logrange(a, b, N::Int=101, γ::Real=1)::Vector{Float64}
+function logrange(a, b, N::Int=101, γ::Real=1)
     ((10 .^ LinRange(0, γ, N)) .- 1)*(b - a)/(10^γ - 1) .+ a
 end
 
@@ -25,10 +40,7 @@ end
 # f(θ, ϕ)
 # approximates ∫∫ f cos(θ) dθ dϕ , with θ∈[-π/2,π/2] and ϕ∈[0,2π]
 export shellintegral
-function shellintegral(f::Function,
-                       param=nothing;
-                       nθ::Int=360,
-                       nϕ::Int=720)::Float6
+function shellintegral(f::Function, param=nothing; nθ::Int=360, nϕ::Int=720)
     I = 0.0
     Δθ = π/nθ
     Δϕ = 2π/nϕ
@@ -43,10 +55,10 @@ function shellintegral(f::Function,
 end
 
 export insertdiff
-function insertdiff(x::AbstractVector{<:Real}, ϵ::Float64=1e-2)::NTuple{2,Vector{Float64}}
+function insertdiff(x::AbstractVector, ϵ::Real=1e-3)
     n = length(x)
-    ξ = zeros(Float64, 3n)
-    δ = zeros(Float64, n)
+    ξ = zeros(eltype(x), 3n)
+    δ = zeros(eltype(x), n)
     δ[1] = ϵ*(x[2] - x[1])
     ξ[1] = x[1]
     ξ[2] = x[1] + δ[1]
@@ -64,41 +76,25 @@ function insertdiff(x::AbstractVector{<:Real}, ϵ::Float64=1e-2)::NTuple{2,Vecto
     return ξ, δ
 end
 
-export evaluatediff!
-function evaluatediff!(d::Vector{Float64},
-                       y::Vector{Float64},
-                       δ::Vector{Float64})::Nothing
+export evaldiff!
+function evaldiff!(d, y, δ)::Nothing
     @assert mod(length(y), 3) == 0
     n = length(y) ÷ 3
     @assert length(d) == length(δ) == n
-    d[1] = (-3y[1] + 4y[2] - y[3])/(2δ[1])
+    d[1] = (-3y[1] + 4y[2] - y[3])/(2δ[1]) #2nd order forward diff
     for i ∈ 2:n-1
-        d[i] = (-y[3i-2] + y[3i])/(2δ[i])
+        @inbounds d[i] = (-y[3i-2] + y[3i])/(2δ[i]) #2nd order central diff
     end
-    d[n] = (y[3n-2] - 4y[3n-1] + 3y[3n])/(2δ[n])
+    d[n] = (y[3n-2] - 4y[3n-1] + 3y[3n])/(2δ[n]) #2nd order backward diff
     return nothing
 end
 
-export evaluatediff
-function evaluatediff(y::Vector{Float64},
-                      δ::Vector{Float64})::Vector{Float64}
+export evaldiff
+function evaldiff(y, δ)
     d = zeros(Float64, length(y) ÷ 3)
-    evaluatediff!(d, y, δ)
+    evaldiff!(d, y, δ)
     return d
 end
-
-#-------------------------------------------------------------------------------
-#log coordinates are handy
-
-#upward calculations
-P2ω(P)::Float64 = -log(P)
-ω2P(ω)::Float64 = exp(-ω)
-P2ω(Pₛ, Pₜ)::NTuple{2,Float64} = P2ω(Pₛ), P2ω(Pₜ)
-
-#downward calculations
-P2ι(P)::Float64 = log(P)
-ι2P(ι)::Float64 = exp(ι)
-P2ι(Pₜ, Pₛ)::NTuple{2,Float64} = P2ι(Pₜ), P2ι(Pₛ)
 
 #------------------------------------------------------------------------------
 # a couple of root finding methods
@@ -111,16 +107,12 @@ function terminate(x₁, x₂, y₁, y₂, tol)::Bool
 end
 
 export regulafalsi
-function regulafalsi(F, x₁, x₂, p=nothing; tol=1e-6)::Float64
+function regulafalsi(F, x₁, x₂, p=nothing; tol=1e-6)
     @assert x₁ != x₂ "starting points must not be identical"
     y₁ = F(x₁, p)
-    if y₁ == 0
-        return x₁
-    end
+    y₁ == 0 && return x₁
     y₂ = F(x₂, p)
-    if y₂ == 0
-        return x₂
-    end
+    y₂ == 0 && return x₂
     @assert sign(y₁) != sign(y₂) "regula falsi non-bracketing"
     yₘ = Inf
     yₚ = NaN
@@ -144,16 +136,12 @@ function regulafalsi(F, x₁, x₂, p=nothing; tol=1e-6)::Float64
 end
 
 export secant
-function secant(F, x₁, x₂, p=nothing; tol=1e-6)::Float64
+function secant(F, x₁, x₂, p=nothing; tol=1e-6)
     @assert x₁ != x₂ "starting points must not be identical"
     y₁ = F(x₁, p)
-    if y₁ == 0
-        return x₁
-    end
+    y₁ == 0 && return x₁
     y₂ = F(x₂, p)
-    if y₂ == 0
-        return x₂
-    end
+    y₂ == 0 && return x₂
     y₃ = Inf
     x₃ = NaN
     n = 0

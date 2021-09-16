@@ -21,3 +21,6 @@ const 𝐆 = 6.6743e-11
 const 𝐓ᵣ = 296.0
 #reference temperature [K] equivalent to 0 degrees Celsius
 const 𝐓₀ = 273.15
+
+#smallest Float64 available
+const TINY = floatmin(Float64)
