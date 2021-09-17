@@ -75,8 +75,10 @@ function OpacityTable(T, P, σ)
     OpacityTable(Φ, ζ)
 end
 
+rawval(Π::OpacityTable, T, P) = exp(Π.Φ(T, log(P)))
+
 #gets cross-section out of interpolators, un-logged [cm^2/molecule]
-(Π::OpacityTable)(T, P) = Π.ζ ? 0*exp(Π.Φ(T, log(P))) : exp(Π.Φ(T, log(P))) 
+(Π::OpacityTable)(T, P) = Π.ζ ? 0.0*rawval(Π, T, P) : rawval(Π, T, P) 
 
 #-------------------------------------------------------------------------------
 #function for building gas opacity tables

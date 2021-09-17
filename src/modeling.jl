@@ -26,17 +26,16 @@ function opticaldepth(P₁::Real,
                       θ::Real,
                       absorbers...;
                       tol::Float64=1e-5
-                      )::Vector{Float64} where {Q,R}
+                      ) where {Q,R}
     #initialization
     P₁, P₂ = max(P₁, P₂), min(P₁, P₂)
-    A = unifyabsorbers(absorbers)
+    A, ν, nν = unifyabsorbers(absorbers)
     checkpressures(A, P₁, P₂)
-    ν, _ = A.ν, A.nν
     ω₁, ω₂ = P2ω(P₁), P2ω(P₂)
     checkazimuth(θ)
     m = 1/cos(θ)
     #spawn integrations in parallel, dynamic schedule
-    tasks = [@spawn depth(dτdω, ω₁, ω₂, A, i, g, m, fT, fμ, tol) for i ∈ eachindex(ν)]
+    tasks = [@spawn depth(dτdω, ω₁, ω₂, A, i, g, m, fT, fμ, tol) for i ∈ 1:nν]
     #fetch the results
     [fetch(task) for task ∈ tasks]
 end
@@ -85,8 +84,7 @@ function outgoing(Pₛ::Real,
                   tol::Real=1e-5 #integrator tolerance
                   ) where {Q,R}
     #initialization
-    A = unifyabsorbers(absorbers)
-    ν, nν = A.ν, A.nν
+    A, ν, nν = unifyabsorbers(absorbers)
     checkpressures(A, Pₛ, Pₜ)
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
     #surface temperature
@@ -101,52 +99,104 @@ function outgoing(Pₛ::Real,
 end
 
 #-------------------------------------------------------------------------------
-export netflux, heating
+export monochromaticfluxes, fluxes, netfluxes, heating
 
-function netflux(P::AbstractVector{<:Real},
-                 g::Real,
-                 fT::Q,
-                 fμ::R,
-                 fS::S,
-                 fα::U,
-                 absorbers...;
-                 nstream::Int=5,
-                 θₛ::Float64=0.841,
-                 tol::Float64=1e-5
-                 )::Vector{Float64} where {Q,R,S,U}
+function monochromaticfluxes(P::AbstractVector{<:Real},
+                             g::Real,
+                             fT::Q,
+                             fμ::R,
+                             fS::S,
+                             fα::U,
+                             absorbers...;
+                             nstream::Int=5,
+                             θₛ::Float64=0.841,
+                             tol::Float64=1e-4) where {Q,R,S,U}
     #setup
-    A = unifyabsorbers(absorbers)
+    A, ν, nν = unifyabsorbers(absorbers)
     #use ascending pressure coordinates
     idx = sortperm(P)
     P = P[idx]
-    checkpressures(A, P[1], P[end])
+    checkpressures(A, P[end], P[1])
     np = length(P)
     checkazimuth(θₛ)
-    ν, nν = A.ν, A.nν
- 
+
     #big blocks of flux
     M⁺ = zeros(np, nν) #monochromatic upward fluxes
     M⁻ = zeros(np, nν) #monochromatic downward fluxes
     #asynchronous, parallel integrations
-    tasks = Vector{Task}(undef, A.nν)
-    for i ∈ eachindex(A.ν)
-        Mᵥ⁻ = view(M⁻,:,i)
-        Mᵥ⁺ = view(M⁺,:,i)
-        tasks[i] = @spawn monochromaticfluxes!(Mᵥ⁻, Mᵥ⁺, P, A.β[i], g, fT, fμ, fS, fα, nstream, θₛ, tol)
+    tasks = Vector{Task}(undef, nν)
+    for i ∈ eachindex(ν)
+        Mᵢ⁻ = view(M⁻,:,i)
+        Mᵢ⁺ = view(M⁺,:,i)
+        tasks[i] = @spawn fluxᵥ!(Mᵢ⁻, Mᵢ⁺, P, A, i, g, fT, fμ, fS, fα, nstream, θₛ, tol)
     end
     [fetch(task) for task ∈ tasks]
 
-    Fₙ = zeros(np)
-    @threads for i ∈ eachindex(P)
-        #the upward flux order must be reversed to match
-        Mᵥ⁺ = @view M⁺[np-i+1,:]
-        #downward fluxes are already in the same order as P
-        Mᵥ⁻ = @view M⁻[i,:]
-        #take the difference of total flux at each level
-        Fₙ[i] = trapz(ν, Mᵥ⁺) - trapz(ν, Mᵥ⁻)
-    end
+    #make ordering consistent with input pressure ordering
+    idx = sortperm(idx)
+    M⁻ = M⁻[idx,:]
+    M⁺ = M⁺[idx,:]
+    #return the big blocks of monochromatic fluxes
+    return M⁻, M⁺
+end
 
-    return Fₙ[sortperm(idx)]
+function fluxes(P::AbstractVector{<:Real},
+                g::Real,
+                fT::Q,
+                fμ::R,
+                fS::S,
+                fα::U,
+                absorbers...;
+                kwargs...) where {Q,R,S,U}
+    #setup
+    A, ν, nν = unifyabsorbers(absorbers)
+    #get monochromatic fluxes
+    M⁻, M⁺ = monochromaticfluxes(P, g, fT, fμ, fS, fα, A; kwargs...)
+    #integrate over wavenumber
+    F⁻ = similar(M⁻, nν)
+    F⁺ = similar(M⁺, nν)
+    @threads for i ∈ eachindex(P)
+        F⁻[i] = trapz(ν, view(M⁻,i,:))
+        F⁺[i] = trapz(ν, view(M⁺,i,:))
+    end
+    return F⁻, F⁺
+end
+
+function netfluxes(P::AbstractVector{<:Real},
+                   g::Real,
+                   fT::Q,
+                   fμ::R,
+                   fS::S,
+                   fα::U,
+                   absorbers...;
+                   kwargs...) where {Q,R,S,U}
+    #setup
+    A, ν, nν = unifyabsorbers(absorbers)
+    #wavenumber integrated fluxes [W/m^2] at each pressure level
+    F⁻, F⁺ = fluxes(P, g, fT, fμ, fS, fα, A; kwargs...)
+    #net flux
+    [(F⁺[i] - F⁻[i]) for i ∈ eachindex(P)]
+end
+
+function ∂Fₙ∂P(P::AbstractVector{<:Real},
+              g::Real,
+              fT::Q,
+              fμ::R,
+              fS::S,
+              fα::U,
+              absorbers...;
+              kwargs...) where {Q,R,S,U}
+    #ensure pressures are sorted in ascending order
+    idx = sortperm(P)
+    P = P[idx]
+    #insert points for 2nd order finite differencing
+    Φ, δ = insertdiff(P)
+    #compute the net fluxes
+    Fₙ = netfluxes(Φ, g, fT, fμ, fS, fα, absorbers...; kwargs...)
+    #evaluate ∂Fₙ/∂P
+    ∂ = evaldiff(Fₙ, δ)
+    #match input ordering and return
+    ∂[sortperm(idx)]
 end
 
 function heating(P::AbstractVector{<:Real},
@@ -157,19 +207,11 @@ function heating(P::AbstractVector{<:Real},
                  fα::U,
                  fcₚ::V, #heat capacity cₚ(T,P) [J/kg/K]
                  absorbers...;
-                 kwargs...
-                 )::Vector{Float64} where {Q,R,S,U,V}
-    #get pressures sorted in ascending order
-    idx = sortperm(P)
-    P = P[idx]
-    #insert points for high-accuracy finite differences
-    Φ, δ = insertdiff(P)
-    #compute the net fluxes
-    Fₙ = netflux(Φ, g, fT, fμ, fS, fα, absorbers...; kwargs...)
-    #take dFₙ/dP
-    ∂ = evaldiff(Fₙ, δ)
-    #apply thermodynamical properties
-    H = zeros(Float64, length(∂))
+                 kwargs...) where {Q,R,S,U,V}
+    #evaluate derivative of net flux w/r/t pressure
+    ∂ = ∂Fₙ∂P(P, g, fT, fμ, fS, fα, absorbers...; kwargs...)
+    #compute heating rates
+    H = similar(∂)
     for i ∈ eachindex(∂)
         #atmospheric temperature
         T = fT(P[i])
@@ -178,5 +220,5 @@ function heating(P::AbstractVector{<:Real},
         #heating rate [Kelvin/s]
         H[i] = ∂[i]*(g/cₚ)
     end
-    return H[sortperm(idx)]
+    return H
 end

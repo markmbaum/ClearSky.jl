@@ -298,8 +298,8 @@ function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F;
     #integrate with in-place dense output
     radau!(T, ω, dTdω, Float64(Tₛ), ω[1], ω[end], param)
     #natural spline in log pressure coordinates
-    itp = LinearInterpolator(ω, T, WeakBoundaries())
-    MoistAdiabat(itp, Pₛ, Pₜ, Tstrat, Ptropo)
+    ϕ = LinearInterpolator(ω, T, WeakBoundaries())
+    MoistAdiabat(ϕ, Pₛ, Pₜ, Tstrat, Ptropo)
 end
 
 #------------------------------------
@@ -403,7 +403,7 @@ function ozonelayer(P, Cmax=8e-6)
     elseif P₃ <= P <= P₂
         return Cmax*(P - P₃)/(P₂ - P₃)
     end
-    return 0
+    return 0.0*P
 end
 
 #-------------------------------------------------------------------------------

@@ -136,6 +136,8 @@ struct AcceleratedAbsorber <: AbstractAbsorber
     ν::Vector{Float64}
     #length of wavenumber vector
     nν::Int64
+    #emptiness flags
+    ζ::Vector{Bool}
     #original pressures
     P::Vector{Float64}
     #reference to UnifiedAbsorber
@@ -151,57 +153,82 @@ function AcceleratedAbsorber(T, P, U::UnifiedAbsorber)
     T = T[idx]
     #log pressure coordinates as usual
     logP = log.(P)
-    #prepare interpolators
+    #initalize an AcceleratedAbsorber with empty interpolators
     ϕ = Vector{LinearInterpolator{Float64, NoBoundaries}}(undef, nν)
     for i ∈ eachindex(ν)
-        #cross-sections from the UnifiedAbsorber
-        σ = U.(i, T, P)
-        #fix values so small they could wreak havoc (specifically, zeros)
-        #set all the tinies to the super low threshold value
-        @. σ[σ < TINY] = TINY
-        #store an interpolating object
-        ϕ[i] = LinearInterpolator(logP, log.(σ), NoBoundaries())
+        ϕ[i] = LinearInterpolator(logP, similar(logP), NoBoundaries())
     end
-    AcceleratedAbsorber(ϕ, ν, nν, P, U)
+    A = AcceleratedAbsorber(ϕ, ν, nν, zeros(Bool, nν), P, U)
+    #then update the cross-sections appropriately
+    update!(A, T)
+    #and return the updated AcceleratedAbsorber
+    return A
+end
+
+"""
+    update!(A::AcceleratedAbsorber, T)
+
+Update the cross-section interpolators underlying an `AcceleratedAbsorber` with a new set of temperatures. The new temperatures should correspond to the pressure levels used when originally constructing the `AcceleratedAbsorber`.  
+"""
+function update!(A::AcceleratedAbsorber, T)::Nothing
+    #check lengths
+    @assert length(T) == length(A.P)
+    L = length(T)
+    #log of smallest float
+    lntiny = log(TINY)
+    #update each interpolators
+    for (i,ϕ) ∈ enumerate(A.ϕ)
+        #counter for tinies
+        ntiny = 0
+        #value vector of interpolators
+        lnσ = values(ϕ)
+        #update each value
+        for j ∈ eachindex(lnσ)
+            #retrieve cross-section from UnifiedAbsorber
+            @inbounds lnσⱼ = log(getσ(A.U, i, T[j], A.P[j]))
+            #set the new value
+            if lnσⱼ < lntiny
+                lnσ[j] = lntiny
+                ntiny += 1 #count the tinies/zeros
+            else
+                lnσ[j] = lnσⱼ
+            end
+        end
+        #check if everything is tiny/empty
+        if ntiny == L
+            A.ζ[i] = true
+        end
+    end
+    nothing
 end
 
 function AcceleratedAbsorber(T, P, absorbers...)
     AcceleratedAbsorber(T, P, UnifiedAbsorber(absorbers))
 end
 
-(A::AcceleratedAbsorber)(i::Int, P) = exp(A.ϕ[i](log(P)))
+rawval(A::AcceleratedAbsorber, i::Int, P) = exp(A.ϕ[i](log(P)))
+
+(A::AcceleratedAbsorber)(i::Int, P) = A.ζ[i] ? 0.0*rawval(A, i, P) : rawval(A, i, P)
 
 (A::AcceleratedAbsorber)(P) = [A(i, P) for i ∈ eachindex(A.ν)]
 
-getσ(A::AcceleratedAbsorber, i, T, P) = @inbounds exp(A.ϕ[i](log(P)))
+getσ(A::AcceleratedAbsorber, i, T, P) = A(i, P)
 
 checkpressures(A::AcceleratedAbsorber, P...) = checkpressures(A.U, P...)
-
-"""
-    update!(A::AcceleratedAbsorber, T::Vector{Float64})
-
-Update the cross-section interpolators underlying an `AcceleratedAbsorber` with a new set of temperatures. The new temperatures should correspond to the pressure levels used when originally constructing the `AcceleratedAbsorber`.  
-"""
-function update!(A::AcceleratedAbsorber, T::AbstractVector{<:Real})
-    @assert length(T) == length(A.P)
-    minlnσ = log(floatmin(Float64))
-    for i ∈ eachindex(A.β)
-        σ = values(A.β[i].ϕ)
-        for j ∈ eachindex(σ)
-            @inbounds σ[j] = max(log(A.U(i, T[j], A.P[j])), minlnσ)
-        end
-    end
-end
 
 #-------------------------------------------------------------------------------
 #making sense of variable absorber inputs
 
-function unifyabsorbers(absorbers::Tuple)::AbstractAbsorber
-    length(absorbers) == 0 && error("no absorbers")
-    if (length(absorbers) == 1) & (typeof(absorbers[1]) <: AbstractAbsorber)
-        return absorbers[1]
+function unifyabsorbers(absorbers::Tuple)
+    L = length(absorbers)
+    L == 0 && error("no absorbers")
+    T = typeof(absorbers[1])
+    if (L == 1) & (T <: AbstractAbsorber)
+        A = absorbers[1]
+    else
+        A = UnifiedAbsorber(absorbers)
     end
-    UnifiedAbsorber(absorbers)
+    return A, A.ν, A.nν
 end
 
 #-------------------------------------------------------------------------------
@@ -215,13 +242,9 @@ function newstreamnodes(n::Int64)::NTuple{2,Vector{Float64}}
     #map angles and weights to θ ∈ [0,π/2]
     θ = @. (π/2)*(x + 1)/2
     w .*= (π/2)/2
-    #sines and cosines of θ
-    c = cos.(θ)
-    s = sin.(θ)
-    #precompute 2π*cos(θ)*sin(θ)*wzxc
-    W = @. 2π*w*c*s
-    #precompute 1/cos(θ) using "m" because μ is for gas molar masses
-    m = 1 ./ c
+    #pre-scaled weights and flipped cosines
+    W = @. 2π*w*cos(θ)*sin(θ)
+    m = @. 1/cos(θ)
     return m, W
 end
 
@@ -336,7 +359,7 @@ function streams(dIdx::Q, #version of schwarzschild equation
                  x₁::Real, #initial pressure coordinate
                  x₂::Real, #final pressure coordinate
                  A::R,
-                 idx::Int,
+                 idx::Int, #index of wavenumber
                  g::Real, #gravity [m/s^2]
                  fT::S, #temperature profile fT(P)
                  fμ::U, #mean molar mass μ(T,P)
@@ -409,22 +432,19 @@ end
 #-------------------------------------------------------------------------------
 # core function for whole atmosphere upward and downward monochromatic fluxes
 
-export monochromaticfluxes!
-
-function monochromaticfluxes!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
-                              M⁺, 
-                              P, #pressure coordinates of output
-                              A::Q,
-                              idx::Int,
-                              g::Real, #gravity [m/s^2]
-                              fT::R, #temperature profile fT(P)
-                              fμ::S, #mean molar mass μ(T,P)
-                              fS::U, #incoming stellar radiation fS(ν) [W/m^2]
-                              fα::V, #surface albedo fα(ν)
-                              nstream::Int=5, #number of streams to integrate in both directions
-                              θₛ::Real=0.841, #stellar radiation angle, corresponds to cos(θ) = 2/3
-                              tol::Real=1e-4
-                              ) where {Q<:AbstractAbsorber,R,S,U,V}
+function fluxᵥ!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
+                M⁺, 
+                P, #pressure coordinates of output
+                A::Q,
+                idx::Int,
+                g::Real, #gravity [m/s^2]
+                fT::R, #temperature profile fT(P)
+                fμ::S, #mean molar mass μ(T,P)
+                fS::U, #incoming stellar radiation fS(ν) [W/m^2]
+                fα::V, #surface albedo fα(ν)
+                nstream::Int, #number of streams to integrate in both directions
+                θₛ::Real, #stellar radiation angle, corresponds to cos(θ) = 2/3
+                tol::Real) where {Q<:AbstractAbsorber,R,S,U,V}
     @assert length(M⁻) == length(M⁺) == length(P)
     #surface pressure assuming ascending pressures
     Pₛ = P[end]
@@ -456,32 +476,4 @@ function monochromaticfluxes!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
     reverse!(M⁺)
 
     nothing
-end
-
-export monochromaticfluxes
-
-function monochromaticfluxes(P, #pressure coordinates of output
-                             A::Q, #AbstractAbsorber
-                             g::Real, #gravity [m/s^2]
-                             fT::R, #temperature profile fT(P)
-                             fμ::S, #mean molar mass μ(T,P)
-                             fS::U, #incoming stellar radiation fS(ν) [W/m^2]
-                             fα::V, #surface albedo fα(ν)
-                             nstream::Int=5, #number of streams to integrate in both directions
-                             θₛ::Real=0.841, #stellar radiation angle, corresponds to cos(θ) = 2/3
-                             tol::Real=1e-4
-                             ) where {Q<:AbstractAbsorber,R,S,U,V}
-    #allocate space for results
-    M⁻ = zeros(length(P), length(A.ν))
-    M⁺ = zeros(length(P), length(A.ν))
-    #asynchronous execution 'cause spectrally variable optical depth
-    tasks = Vector{Task}(undef, A.nν)
-    for i ∈ eachindex(A.ν)
-        Mᵥ⁻ = view(M⁻,:,i)
-        Mᵥ⁺ = view(M⁺,:,i)
-        tasks[i] = @spawn monochromaticfluxes!(Mᵥ⁻, Mᵥ⁺, P, A, i, g, fT, fμ, fS, fα, nstream, θₛ, tol)
-    end
-    [fetch(task) for task ∈ tasks]
-
-    return M⁻, M⁺
 end

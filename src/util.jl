@@ -91,9 +91,10 @@ end
 
 export evaldiff
 function evaldiff(y, δ)
-    d = zeros(Float64, length(y) ÷ 3)
-    evaldiff!(d, y, δ)
-    return d
+    ∂ = similar
+    ∂ = similar(y, length(y) ÷ 3)
+    evaldiff!(∂, y, δ)
+    return ∂
 end
 
 #------------------------------------------------------------------------------
