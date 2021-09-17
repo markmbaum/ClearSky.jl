@@ -13,7 +13,12 @@ ScalarRadau = "52145ff8-3717-48bc-b8ab-44d3704098ee"
 
 [compat]
 Faddeyeva985 = "1"
-julia = "1.5"
+Cubature = "1"
+ProgressMeter = "1"
+QuadGK = "2"
+BasicInterpolators = "0.5"
+ScalarRadau = "1"
+julia = "1.6"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
