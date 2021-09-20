@@ -448,6 +448,10 @@ function findgas(f::String, cianame::String, gases::Gas...)
     return gases[idx[1]]
 end
 
+function CIA(ciatables::CIATables, gases::Tuple{})
+    error("no Gas objects provided, cannot create CIA object")
+end
+
 function CIA(ciatables::CIATables, gases::Tuple)
     #gas formulae
     f₁, f₂ = ciatables.formulae

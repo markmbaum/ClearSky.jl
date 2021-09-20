@@ -57,18 +57,23 @@ end
 export insertdiff
 function insertdiff(x::AbstractVector, ϵ::Real=1e-3)
     n = length(x)
+    #output version of x with additional coordinates
     ξ = zeros(eltype(x), 3n)
+    #spacing for each original point in x
     δ = zeros(eltype(x), n)
+    #first element
     δ[1] = ϵ*(x[2] - x[1])
     ξ[1] = x[1]
     ξ[2] = x[1] + δ[1]
     ξ[3] = x[1] + 2δ[1]
-    for i ∈ 2:n-1
+    #interior elements
+    @inbounds for i ∈ 2:n-1
         δ[i] = ϵ*min(x[i] - x[i-1], x[i+1] - x[i])
         ξ[3i-2] = x[i] - δ[i]
         ξ[3i-1] = x[i]
         ξ[3i]   = x[i] + δ[i]
     end
+    #last element
     δ[n] = ϵ*(x[n] - x[n-1])
     ξ[3n-2] = x[n] - 2δ[n]
     ξ[3n-1] = x[n] - δ[n]
@@ -77,21 +82,24 @@ function insertdiff(x::AbstractVector, ϵ::Real=1e-3)
 end
 
 export evaldiff!
-function evaldiff!(d, y, δ)::Nothing
+function evaldiff!(∂, y, δ)::Nothing
+    #check the dimensions line up
     @assert mod(length(y), 3) == 0
     n = length(y) ÷ 3
-    @assert length(d) == length(δ) == n
-    d[1] = (-3y[1] + 4y[2] - y[3])/(2δ[1]) #2nd order forward diff
+    @assert length(∂) == length(δ) == n
+    #2nd order forward diff at first element
+    ∂[1] = (-3y[1] + 4y[2] - y[3])/(2δ[1])
+    #2nd order central diff at interior points
     for i ∈ 2:n-1
-        @inbounds d[i] = (-y[3i-2] + y[3i])/(2δ[i]) #2nd order central diff
+        @inbounds ∂[i] = (-y[3i-2] + y[3i])/(2δ[i]) 
     end
-    d[n] = (y[3n-2] - 4y[3n-1] + 3y[3n])/(2δ[n]) #2nd order backward diff
+    #2nd order backward diff at last element
+    ∂[n] = (y[3n-2] - 4y[3n-1] + 3y[3n])/(2δ[n]) 
     return nothing
 end
 
 export evaldiff
 function evaldiff(y, δ)
-    ∂ = similar
     ∂ = similar(y, length(y) ÷ 3)
     evaldiff!(∂, y, δ)
     return ∂

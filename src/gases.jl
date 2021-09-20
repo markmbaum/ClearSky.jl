@@ -75,10 +75,8 @@ function OpacityTable(T, P, σ)
     OpacityTable(Φ, ζ)
 end
 
-rawval(Π::OpacityTable, T, P) = exp(Π.Φ(T, log(P)))
-
 #gets cross-section out of interpolators, un-logged [cm^2/molecule]
-(Π::OpacityTable)(T, P) = Π.ζ ? 0.0*rawval(Π, T, P) : rawval(Π, T, P) 
+(Π::OpacityTable)(T, P) = Π.ζ ? 0.0*exp(Π.Φ(T, log(P))) : exp(Π.Φ(T, log(P)))
 
 #-------------------------------------------------------------------------------
 #function for building gas opacity tables
@@ -173,6 +171,8 @@ end
 #-------------------------------------------------------------------------------
 #defining Gas struct and access to cross-sections
 
+abstract type AbstractGas end
+
 export Gas
 export rawσ, concentration, reconcentrate
 
@@ -196,7 +196,7 @@ Gas type for real-gas, radiatively active, atmospheric constituents. Must be con
 
 Same arguments as the first constructor, but reads a `par` file directly into the gas object. Keyword arguments are passed through to [`readpar`](@ref).
 """
-struct Gas{T,F}
+struct Gas{T,F} <: AbstractGas
     name::String
     formula::String
     μ::Float64 #mean molar mass
@@ -285,3 +285,21 @@ function reconcentrate(g::Gas{U,V}, fC::F)::Gas where {U,V,F}
     #construct a new gas WITHOUT COPYING
     Gas{U,F}(g.name, g.formula, g.μ, g.ν, g.Ω, g.Π, fC)
 end
+
+#---------------------------------------
+
+export GrayGas
+
+struct GrayGas <: AbstractGas
+    name::String
+    formula::String
+    μ::Float64
+    ν::Vector{Float64}
+    σ::Float64
+end
+
+function GrayGas(σ::Real, ν::AbstractVector{<:Real})
+    GrayGas("gray", "-", NaN, collect(Float64, ν), Float64(σ))
+end
+
+(g::GrayGas)(x...) = g.σ

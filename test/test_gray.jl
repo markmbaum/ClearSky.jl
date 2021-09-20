@@ -1,6 +1,7 @@
 using Cubature
 using BasicInterpolators: CubicSplineInterpolator, NoBoundaries
 using Base.Threads: @threads
+using Test
 
 using ClearSky
 using ClearSky: stream, dIdω, P2ω
@@ -25,16 +26,21 @@ end
 function numericaloutgoing(σ, g, μ, cₚ, Pₛ, Tₛ, Pₜ=1e-3, tol=1e-9)
     #nice big, wide wavenumber sample
     ν = [logrange(1e-6, 1e5, 10000, 4); 1e6]
-    #gray gas object with uniform cross-section at all ν
-    gray = GrayGas(σ, ν)
     #absorber wrapper
-    G = GroupedAbsorber(gray)
+    U = UnifiedAbsorber(GrayGas(σ, ν))
     #dry adiabat, whole atmosphere
     Γ = DryAdiabat(Tₛ, Pₛ, cₚ, μ)
+    # 1/cos(θ)
+    m = 1.0
+    #mean molar mass
+    fμ(T,P) = μ
+    #transformed coords
+    ω₁, ω₂ = P2ω(Pₛ), P2ω(Pₜ)
     #compute OLR
     olr = zeros(length(ν))
     @threads for i ∈ eachindex(ν)
-        olr[i] = π*stream(dIdω, planck(ν[i], Tₛ), P2ω(Pₛ), P2ω(Pₜ), G, i, g, 1, Γ, (T,P)->μ, tol)
+        I₀ = planck(ν[i], Tₛ)
+        olr[i] = π*stream(dIdω, I₀, ω₁, ω₂, U, i, g, m, Γ, fμ, tol)
     end
     #make an interpolator for smooth integration
     ϕ = CubicSplineInterpolator([0.0; ν], [0.0; olr], NoBoundaries())
@@ -50,15 +56,21 @@ g = 10 #gravity [m/s^2]
 cₚ = 1e3 #heat capacity [J/kg/K]
 Pₛ = 1e5 #surface pressure [Pa]
 Tₛ = 300 #surface temperature [K]
-σ = 10 .^ range(-28, -23, length=50) #gray gas absorption coefs [cm^2/molecule]
+σ = 10 .^ range(-29, -23, length=10) #gray gas absorption coefs [cm^2/molecule]
 
-τ = totalopticaldepth.(σ, g, μ, Pₛ)
-OLRₐ = analyticaloutgoing.(σ, g, μ, cₚ, Pₛ, Tₛ)
-OLRₙ = numericaloutgoing.(σ, g, μ, cₚ, Pₛ, Tₛ, 1e-6)
-err = OLRₙ .- OLRₐ
-abserr = abs.(err)
-relerr = abserr ./ OLRₐ
-@test all(relerr .< 0.1)
+#test accuracy with different optical depths
+abserr = similar(σ)
+relerr = similar(σ)
+τ = similar(σ)
+for (i,σᵢ) ∈ enumerate(σ)
+    τ[i] = totalopticaldepth(σᵢ, g, μ, Pₛ)
+    OLRₐ = analyticaloutgoing(σᵢ, g, μ, cₚ, Pₛ, Tₛ)
+    OLRₙ = numericaloutgoing(σᵢ, g, μ, cₚ, Pₛ, Tₛ, 1e-6)
+    err = OLRₙ - OLRₐ
+    abserr[i] = abs(err)
+    relerr[i] = abserr[i] / OLRₐ
+    @test relerr[i] < 0.01
+end
 
 ##
 
