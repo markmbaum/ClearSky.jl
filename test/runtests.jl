@@ -1,6 +1,5 @@
 using ClearSky
 using Test
-using SpecialFunctions
 
 using ClearSky: MOLPARAM
 

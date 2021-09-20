@@ -151,14 +151,38 @@ end
 #-------------------------------------------------------------------------------
 
 #general function for adiabat with one condensible in bulk non-condensible
-function dTdω(ω, T, cₚₙ, cₚᵥ, Rₙ, Rᵥ, L, psat::F) where {F}
+function dTdP(P, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F) where {F}
     #molar mixing ratio of condensible
-    α = psat(T)/ω2P(ω)
+    α = psat(T)/P
+    #specific gas constants
+    Rₙ = 𝐑/μₙ
+    Rᵥ = 𝐑/μᵥ
     #whole expression at once
-    -T*(Rₙ/cₚₙ)*(1 + α*L/(Rₙ*T))/(1 + α*(cₚᵥ/cₚₙ + (L/(T*Rᵥ) - 1)*L/(cₚₙ*T)))
+    (T/P)*(Rₙ/cₚₙ)*(1 + α*L/(Rₙ*T))/(1 + α*(cₚᵥ/cₚₙ + (L/(T*Rᵥ) - 1)*L/(cₚₙ*T)))
 end
 
+#same function in ω coordinates
+function dTdω(ω, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F) where {F}
+    -ω2P(ω)*dTdP(ω2P(ω), T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F)
+end
+
+#slurp up the parameters for integrations
 dTdω(ω, T, param::Tuple) = dTdω(ω, T, param...)
+
+#-------------------------------------------------------------------------------
+#exported wrappers of dTdω
+
+export lapserate
+
+#single-condensible moist lapse rate
+function lapserate(P, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F) where {F}
+    dTdP(P, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F)
+end
+
+#dry lapse rate
+function lapserate(P, T, cₚ, μ)
+    dTdP(P, T, cₚ, 1, μ, 1, 0, T->0)
+end
 
 #------------------------------------
 
@@ -213,18 +237,20 @@ D = DryAdiabat(Tₛ, Pₛ, cₚ, μ, Tstrat=190);
 D.([4e4, 3e4, 2e4, 1e4])
 ```
 """
-struct DryAdiabat <: AbstractAdiabat
-    Tₛ::Float64
-    Pₛ::Float64
-    Pₜ::Float64
-    cₚ::Float64
-    μ::Float64
-    Tstrat::Float64
-    Ptropo::Float64
+struct DryAdiabat{U} <: AbstractAdiabat
+    Tₛ::U
+    Pₛ::U
+    Pₜ::U
+    cₚ::U
+    μ::U
+    Tstrat::U
+    Ptropo::U
 end
 
 function DryAdiabat(Tₛ, Pₛ, cₚ, μ; Tstrat=0, Ptropo=0, Pₜ=PMIN)
     checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
+    Tₛ = float(Tₛ)
+    Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo = promote(Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo)
     DryAdiabat(Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo)
 end
 
@@ -275,28 +301,32 @@ M = MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat, Ptropo=1e4
 M.([3e4, 2e4, 1e4, 5e3])
 ```
 """
-struct MoistAdiabat <: AbstractAdiabat
-    ϕ::LinearInterpolator{Float64,WeakBoundaries}
-    Pₛ::Float64
-    Pₜ::Float64
-    Tstrat::Float64
-    Ptropo::Float64
+struct MoistAdiabat{U} <: AbstractAdiabat
+    ϕ::LinearInterpolator{U,WeakBoundaries}
+    Pₛ::U
+    Pₜ::U
+    Tstrat::U
+    Ptropo::U
 end
 
 function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F;
                       Tstrat=0.0,
                       Ptropo=0.0,
-                      N::Int=100,
+                      N::Int=200,
                       Pₜ=PMIN) where {F}
+    #basic checks
     checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
+    #type uniformity
+    Tₛ = float(Tₛ)
+    Tₛ, Pₛ, Pₜ, Tstrat, Ptropo = promote(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
     #interpolation knots and output vector
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
     ω = logrange(ω₁, ω₂, N)
-    T = zeros(Float64, N)
+    T = zeros(typeof(Tₛ), N)
     #pack the parameters
-    param = (cₚₙ, cₚᵥ, 𝐑/μₙ, 𝐑/μᵥ, L, psat)
+    param = (cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat)
     #integrate with in-place dense output
-    radau!(T, ω, dTdω, Float64(Tₛ), ω[1], ω[end], param)
+    radau!(T, ω, dTdω, Tₛ, ω[1], ω[end], param)
     #natural spline in log pressure coordinates
     ϕ = LinearInterpolator(ω, T, WeakBoundaries())
     MoistAdiabat(ϕ, Pₛ, Pₜ, Tstrat, Ptropo)

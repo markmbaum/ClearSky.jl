@@ -102,12 +102,14 @@ end
 
 #https://discourse.julialang.org/t/tuple-indexing-taking-time/58309/18?u=markmbaum
 #also see "applychain" here for a similar example: https://github.com/FluxML/Flux.jl/blob/dbb9f82ef8d4e196259ff1af56aeddc626159bf3/src/layers/basic.jl#L46
-σchain(::Tuple{}, x, T, P) = zero(T)
+σchain(::Tuple{}, x, T, P) = 0
 
 σchain(A::Tuple, x, T, P) = first(A)(x, T, P) + σchain(tail(A), x, T, P)
 
 function σchain(U::UnifiedAbsorber, i::Int, ν, T, P)
-    σchain(U.gas, i, T, P) + σchain(U.cia, ν, T, P) + σchain(U.fun, ν, T, P)
+    ( σchain(U.gas, i, T, P)
+    + σchain(U.cia, ν, T, P)
+    + σchain(U.fun, ν, T, P))
 end
 
 #internal
@@ -137,8 +139,6 @@ struct AcceleratedAbsorber <: AbstractAbsorber
     ν::Vector{Float64}
     #length of wavenumber vector
     nν::Int64
-    #emptiness flags
-    ζ::Vector{Bool}
     #original pressures
     P::Vector{Float64}
     #reference to UnifiedAbsorber
@@ -159,7 +159,7 @@ function AcceleratedAbsorber(T, P, U::UnifiedAbsorber)
     for i ∈ eachindex(ν)
         ϕ[i] = LinearInterpolator(logP, similar(logP), NoBoundaries())
     end
-    A = AcceleratedAbsorber(ϕ, ν, nν, zeros(Bool, nν), P, U)
+    A = AcceleratedAbsorber(ϕ, ν, nν, P, U)
     #then update the cross-sections appropriately
     update!(A, T)
     #and return the updated AcceleratedAbsorber
@@ -179,8 +179,6 @@ function update!(A::AcceleratedAbsorber, T)::Nothing
     lntiny = log(TINY)
     #update each interpolators
     for (i,ϕ) ∈ enumerate(A.ϕ)
-        #counter for tinies
-        ntiny = 0
         #value vector of interpolators
         lnσ = values(ϕ)
         #update each value
@@ -188,16 +186,7 @@ function update!(A::AcceleratedAbsorber, T)::Nothing
             #retrieve cross-section from UnifiedAbsorber
             @inbounds lnσⱼ = log(𝝈(A.U, i, T[j], A.P[j]))
             #set the new value
-            if lnσⱼ < lntiny
-                lnσ[j] = lntiny
-                ntiny += 1 #count the tinies/zeros
-            else
-                lnσ[j] = lnσⱼ
-            end
-        end
-        #check if everything is tiny/empty
-        if ntiny == L
-            A.ζ[i] = true
+            @inbounds lnσ[j] = (lnσⱼ < lntiny) ? lntiny : lnσⱼ
         end
     end
     nothing
@@ -208,21 +197,11 @@ function AcceleratedAbsorber(T, P, absorbers...)
 end
 
 #internal
-function 𝝈(A::AcceleratedAbsorber, i, T, P)
-    @inbounds ϕ = A.ϕ[i]
-    @inbounds ζ = A.ζ[i]
-    σ = exp(ϕ(log(P)))
-    ζ ? 0.0*σ : σ
-end
+𝝈(A::AcceleratedAbsorber, i, T, P) = @inbounds exp(A.ϕ[i](log(P)))
 
-function (A::AcceleratedAbsorber)(i::Int, P)
-    ϕ = A.ϕ[i]
-    ζ = A.ζ[i]
-    σ = exp(ϕ(log(P)))
-    ζ ? 0.0*σ : σ
-end
+(A::AcceleratedAbsorber)(i::Int, P) = exp(A.ϕ[i](log(P)))
 
-(A::AcceleratedAbsorber)(P) = [A(i, P) for i ∈ eachindex(A.ν)]
+(A::AcceleratedAbsorber)(P) = [𝛔(A, i, nothing, P) for i ∈ eachindex(A.ν)]
 
 checkpressures(A::AcceleratedAbsorber, P...) = checkpressures(A.U, P...)
 
@@ -274,7 +253,7 @@ end
 
 function dτdP(P, τ, param::Tuple)
     #unpack parameters
-    A, idx, g, m, fT, fμ = param
+    A, idx, g, 𝓂, fT, fμ = param
     #temperature from given profile
     T = fT(P)
     #mean molar mass
@@ -282,12 +261,12 @@ function dτdP(P, τ, param::Tuple)
     #sum of all cross-sections
     σ = 𝝈(A, idx, T, P)
     #compute dτ/dlnP, scaled by the angle m = 1/cos(θ)
-    m*dτdP(σ, g, μ) #no Planck emission
+    𝓂*dτdP(σ, g, μ) #no Planck emission
 end
 
 function dIdP(P, I, param::Tuple)
     #unpack parameters
-    A, idx, g, m, fT, fμ = param
+    A, idx, g, 𝓂, fT, fμ = param
     #compute temperature from given profile
     T = fT(P)
     #compute mean molar mass
@@ -297,7 +276,7 @@ function dIdP(P, I, param::Tuple)
     #pull out wavenumber
     ν = @inbounds A.ν[idx]
     #compute dI/dlnP, scaled by the angle m = 1/cos(θ)
-    m*schwarzschild(I, ν, σ, g, μ, T)
+    𝓂*schwarzschild(I, ν, σ, g, μ, T)
 end
 
 #-------------------------------------------------------------------------------
@@ -332,13 +311,13 @@ function depth(dτdx::Q,
                𝔸::R,
                idx::Int,
                g::Real,
-               m::Real, # 1/cos(θ)
+               𝓂::Real, # 1/cos(θ)
                fT::S,
                fμ::U,
                tol::Float64
                ) where {Q,R<:AbstractAbsorber,S,U}
     #pack parameters
-    param = (𝔸, idx, g, m, fT, fμ)
+    param = (𝔸, idx, g, 𝓂, fT, fμ)
     #integrate with the ODE solver (appears to be faster than quadrature)
     radau(dτdx, 0.0, x₁, x₂, param, atol=tol, rtol=tol)
 end
@@ -353,13 +332,13 @@ function stream(dIdx::Q, #version of schwarzschild equation
                 𝔸::R,
                 idx::Int,
                 g::Real, #gravity [m/s^2]
-                m::Real, #1/cos(θ), where θ is the stream angle
+                𝓂::Real, #1/cos(θ), where θ is the stream angle
                 fT::S, #temperature profile fT(P)
                 fμ::U, #mean molar mass μ(T,P)
                 tol::Real #integrator error tolerance
                 ) where {Q,R<:AbstractAbsorber,S,U}
     #pack parameters
-    param = (𝔸, idx, g, m, fT, fμ)
+    param = (𝔸, idx, g, 𝓂, fT, fμ)
     #integrate the Schwarzschild equation in log pressure coords and return
     radau(dIdx, I₀, x₁, x₂, param, atol=tol, rtol=tol)
 end
@@ -398,13 +377,13 @@ function stream!(I, #output/solution vector
                  𝔸::R,
                  idx::Int,
                  g::Real, #gravity [m/s^2]
-                 m::Real, #1/cos(θ), where θ is the stream angle
+                 𝓂::Real, #1/cos(θ), where θ is the stream angle
                  fT::S, #temperature profile fT(P)
                  fμ::U, #mean molar mass μ(T,P)
                  tol::Real #integrator error tolerance
                  )::Nothing where {Q,R<:AbstractAbsorber,S,U}
     #pack parameters
-    param = (𝔸, idx, g, m, fT, fμ)
+    param = (𝔸, idx, g, 𝓂, fT, fμ)
     #integrate the Schwarzschild equation in log pressure coords, in-place
     radau!(I, x, dIdx, I₀, x[1], x[end], param, atol=tol, rtol=tol)
     return nothing
@@ -430,7 +409,7 @@ function streams!(M, #output/solution vector
     #solve schwarzschild w multiple streams, integrating over hemisphere
     for i ∈ 1:nstream
         stream!(I, x, dIdx, I₀, 𝔸, idx, g, 𝓂[i], fT, fμ, tol)
-        # integral over hemisphere: ∫∫ I cos(θ) sin(θ) dθ dϕ, where θ∈[0,π/2], ϕ∈[0,2π]
+        #integral over hemisphere: ∫∫ I cos(θ) sin(θ) dθ dϕ, where θ∈[0,π/2], ϕ∈[0,2π]
         for j ∈ eachindex(M)
             @inbounds M[j] += 𝒲[i]*I[j] #W = 2π*w*cos(θ)*sin(θ), precomputed
         end
@@ -462,7 +441,7 @@ function fluxᵥ!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
     #wavenumber
     ν = 𝔸.ν[idx]
     #angle factor for incoming stellar radiation
-    m = 1/cos(θₛ)
+    𝓂 = 1/cos(θₛ)
     #downward stellar irradiance at ν
     Iₜ⁻ = fS(ν)
     #transformed pressure coordinates
@@ -470,7 +449,7 @@ function fluxᵥ!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
     reverse!(ω)
     ι = P2ι.(P)
     #downward stellar irradiance throughout atmosphere
-    stream!(M⁻, ι, dIdι, Iₜ⁻, 𝔸, idx, g, m, fT, fμ, tol)
+    stream!(M⁻, ι, dIdι, Iₜ⁻, 𝔸, idx, g, 𝓂, fT, fμ, tol)
     #convert to flux
     M⁻ .*= cos(θₛ)
     #add the atmospheric contribution to downward flux

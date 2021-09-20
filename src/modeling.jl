@@ -153,8 +153,8 @@ function fluxes(P::AbstractVector{<:Real},
     #get monochromatic fluxes
     M⁻, M⁺ = monochromaticfluxes(P, g, fT, fμ, fS, fα, 𝔸; kwargs...)
     #integrate over wavenumber
-    F⁻ = similar(M⁻, nν)
-    F⁺ = similar(M⁺, nν)
+    F⁻ = similar(M⁻, size(M⁻, 1))
+    F⁺ = similar(M⁺, size(M⁺, 1))
     @threads for i ∈ eachindex(P)
         F⁻[i] = trapz(ν, view(M⁻,i,:))
         F⁺[i] = trapz(ν, view(M⁺,i,:))
@@ -170,10 +170,8 @@ function netfluxes(P::AbstractVector{<:Real},
                    fα::U,
                    absorbers...;
                    kwargs...) where {Q,R,S,U}
-    #setup
-    𝔸, ν, nν = unifyabsorbers(absorbers)
     #wavenumber integrated fluxes [W/m^2] at each pressure level
-    F⁻, F⁺ = fluxes(P, g, fT, fμ, fS, fα, 𝔸; kwargs...)
+    F⁻, F⁺ = fluxes(P, g, fT, fμ, fS, fα, absorbers...; kwargs...)
     #net flux
     [(F⁺[i] - F⁻[i]) for i ∈ eachindex(P)]
 end

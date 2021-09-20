@@ -16,7 +16,7 @@ P2ι(Pₜ, Pₛ) = P2ι(Pₜ), P2ι(Pₛ)
 export trapz
 function trapz(x::AbstractVector, y::AbstractVector)
     @assert length(x) == length(y) "vectors must be equal length"
-    s = 0.0
+    s = zero(eltype(y))
     for i = 1:length(x) - 1
         @inbounds s += (x[i+1] - x[i])*(y[i] + y[i+1])/2
     end

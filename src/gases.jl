@@ -61,7 +61,6 @@ export OpacityTable
 
 struct OpacityTable{M,N}
     Φ::BichebyshevInterpolator{M,N,Float64}
-    ζ::Bool #flag indicating if the table is empty/zero
 end
 
 # T: temperature grid coordinates [K]
@@ -72,11 +71,11 @@ function OpacityTable(T, P, σ)
     lnP = log.(P)
     lnσ = ζ ? fill(log(TINY), size(σ)) : log.(σ)
     Φ = BichebyshevInterpolator(T, lnP, lnσ)
-    OpacityTable(Φ, ζ)
+    OpacityTable(Φ)
 end
 
 #gets cross-section out of interpolators, un-logged [cm^2/molecule]
-(Π::OpacityTable)(T, P) = Π.ζ ? 0.0*exp(Π.Φ(T, log(P))) : exp(Π.Φ(T, log(P)))
+(Π::OpacityTable)(T, P) = exp(Π.Φ(T, log(P)))
 
 #-------------------------------------------------------------------------------
 #function for building gas opacity tables

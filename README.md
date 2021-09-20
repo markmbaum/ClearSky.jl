@@ -5,4 +5,4 @@
 [![Build Status](https://github.com/markmbaum/ClearSky.jl/workflows/CI/badge.svg)](https://github.com/markmbaum/ClearSky.jl/actions)
 [![Codecov](https://img.shields.io/codecov/c/github/markmbaum/ClearSky.jl?logo=codecov)](https://codecov.io/gh/markmbaum/ClearSky.jl)
 
-*under development*
+*work in progress*
