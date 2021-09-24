@@ -54,6 +54,8 @@ function shellintegral(f::Function, param=nothing; nθ::Int=360, nϕ::Int=720)
     return I
 end
 
+#function epsdiff(x, )
+
 export insertdiff
 function insertdiff(x::AbstractVector, ϵ::Real=1e-3)
     n = length(x)
@@ -105,6 +107,18 @@ function evaldiff(y, δ)
     return ∂
 end
 
+#performing a dot product as if you only know one element of one of the vectors at a time
+function dots(x, y)
+    d = zero(y)
+    for i = 1:length(x)-1
+        d += x[i]
+        d *= y[i]/y[i+1]
+    end
+    d += x[end]
+    d *= y[end]
+    return d
+end
+
 #------------------------------------------------------------------------------
 # a couple of root finding methods
 
@@ -123,8 +137,8 @@ function regulafalsi(F, x₁, x₂, p=nothing; tol=1e-6)
     y₂ = F(x₂, p)
     y₂ == 0 && return x₂
     @assert sign(y₁) != sign(y₂) "regula falsi non-bracketing"
-    yₘ = Inf
-    yₚ = NaN
+    yₘ = floatmax(y₂)
+    yₚ = zero(y₂)
     n = 0
     while !terminate(x₁, x₂, yₚ, yₘ, tol) || (n < 2)
         #store previous evaluation
@@ -151,8 +165,8 @@ function secant(F, x₁, x₂, p=nothing; tol=1e-6)
     y₁ == 0 && return x₁
     y₂ = F(x₂, p)
     y₂ == 0 && return x₂
-    y₃ = Inf
-    x₃ = NaN
+    y₃ = floatmax(y₂)
+    x₃ = zero(x₂)
     n = 0
     while !terminate(x₁, x₂, y₁, y₂, tol) || (n < 2)
         #approximate zero

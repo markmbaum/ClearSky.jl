@@ -30,7 +30,7 @@ function opticaldepth(P₁::Real,
     #initialization
     P₁, P₂ = max(P₁, P₂), min(P₁, P₂)
     𝔸, ν, nν = unifyabsorbers(absorbers)
-    checkpressures(A, P₁, P₂)
+    checkpressures(𝔸, P₁, P₂)
     ω₁, ω₂ = P2ω(P₁), P2ω(P₂)
     checkazimuth(θ)
     𝓂 = 1/cos(θ)
@@ -119,16 +119,19 @@ function monochromaticfluxes(P::AbstractVector{<:Real},
     checkpressures(𝔸, P[end], P[1])
     np = length(P)
     checkazimuth(θₛ)
+    #transformed coordinates
+    ω, ι = P2ω.(P), P2ι.(P)
+    reverse!(ω)
 
     #big blocks of flux
-    M⁺ = zeros(np, nν) #monochromatic upward fluxes
-    M⁻ = zeros(np, nν) #monochromatic downward fluxes
+    M⁺ = zeros(eltype(P), np, nν) #monochromatic upward fluxes
+    M⁻ = zeros(eltype(P), np, nν) #monochromatic downward fluxes
     #asynchronous, parallel integrations
     tasks = Vector{Task}(undef, nν)
     for i ∈ eachindex(ν)
-        Mᵢ⁻ = view(M⁻,:,i)
-        Mᵢ⁺ = view(M⁺,:,i)
-        tasks[i] = @spawn fluxᵥ!(Mᵢ⁻, Mᵢ⁺, P, 𝔸, i, g, fT, fμ, fS, fα, nstream, θₛ, tol)
+        Mᵢ⁻ = @view M⁻[:,i]
+        Mᵢ⁺ = @view M⁺[:,i]
+        tasks[i] = @spawn monoflux!(Mᵢ⁻, Mᵢ⁺, P, ω, ι, 𝔸, i, g, fT, fμ, fS, fα, nstream, θₛ, tol)
     end
     [fetch(task) for task ∈ tasks]
 
@@ -187,7 +190,7 @@ function netfluxderivs(P::AbstractVector{<:Real},
     #ensure pressures are sorted in ascending order
     idx = sortperm(P)
     P = P[idx]
-    #insert points for 2nd order finite differencing
+    #insert points for 2nd order finite differencing in ln(P) space
     Φ, δ = insertdiff(P)
     #compute the net fluxes
     Fₙ = netfluxes(Φ, g, fT, fμ, fS, fα, absorbers...; kwargs...)

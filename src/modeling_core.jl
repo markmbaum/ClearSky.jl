@@ -153,14 +153,14 @@ function AcceleratedAbsorber(T, P, U::UnifiedAbsorber)
     P = P[idx]
     T = T[idx]
     #log pressure coordinates as usual
-    logP = log.(P)
+    lnP = log.(P)
     #initalize an AcceleratedAbsorber with empty interpolators
     ϕ = Vector{LinearInterpolator{Float64, NoBoundaries}}(undef, nν)
     for i ∈ eachindex(ν)
-        ϕ[i] = LinearInterpolator(logP, similar(logP), NoBoundaries())
+        ϕ[i] = LinearInterpolator(lnP, similar(lnP), NoBoundaries())
     end
     A = AcceleratedAbsorber(ϕ, ν, nν, P, U)
-    #then update the cross-sections appropriately
+    #then update the cross-sections in-place
     update!(A, T)
     #and return the updated AcceleratedAbsorber
     return A
@@ -174,19 +174,16 @@ Update the cross-section interpolators underlying an `AcceleratedAbsorber` with 
 function update!(A::AcceleratedAbsorber, T)::Nothing
     #check lengths
     @assert length(T) == length(A.P)
-    L = length(T)
     #log of smallest float
     lntiny = log(TINY)
     #update each interpolators
     for (i,ϕ) ∈ enumerate(A.ϕ)
-        #value vector of interpolators
-        lnσ = values(ϕ)
         #update each value
-        for j ∈ eachindex(lnσ)
+        for j ∈ eachindex(T)
             #retrieve cross-section from UnifiedAbsorber
-            @inbounds lnσⱼ = log(𝝈(A.U, i, T[j], A.P[j]))
+            lnσⱼ = log(𝝈(A.U, i, T[j], A.P[j]))
             #set the new value
-            @inbounds lnσ[j] = (lnσⱼ < lntiny) ? lntiny : lnσⱼ
+            ϕ[j] = (lnσⱼ < lntiny) ? lntiny : lnσⱼ
         end
     end
     nothing
@@ -197,7 +194,7 @@ function AcceleratedAbsorber(T, P, absorbers...)
 end
 
 #internal
-𝝈(A::AcceleratedAbsorber, i, T, P) = @inbounds exp(A.ϕ[i](log(P)))
+𝝈(A::AcceleratedAbsorber, i::Int, ::Any, P) = @inbounds exp(A.ϕ[i](log(P)))
 
 (A::AcceleratedAbsorber)(i::Int, P) = exp(A.ϕ[i](log(P)))
 
@@ -251,7 +248,7 @@ end
 #-------------------------------------------------------------------------------
 # core differential equations with Tuples of parameters
 
-function dτdP(P, τ, param::Tuple)
+function dτdP(P, ::Any, param::Tuple)
     #unpack parameters
     A, idx, g, 𝓂, fT, fμ = param
     #temperature from given profile
@@ -362,7 +359,7 @@ function streams(dIdx::Q, #version of schwarzschild equation
     for i ∈ 1:nstream
         I = stream(dIdx, I₀, x₁, x₂, 𝔸, idx, g, 𝓂[i], fT, fμ, tol)
         # integral over hemisphere: ∫∫ I cos(θ) sin(θ) dθ dϕ, where θ∈[0,π/2], ϕ∈[0,2π]
-        @inbounds M += 𝒲[i]*I #W = 2π*w*cos(θ)*sin(θ), precomputed
+        M += 𝒲[i]*I #W = 2π*w*cos(θ)*sin(θ), precomputed
     end
     return M
 end
@@ -404,35 +401,35 @@ function streams!(M, #output/solution vector
     @assert length(M) == length(x)
     #setup gaussian quadrature nodes
     𝓂, 𝒲 = streamnodes(nstream)
-    #temporary irradiance vector
-    I = similar(M) #allocating shouldn't usually be that costly, overall
     #solve schwarzschild w multiple streams, integrating over hemisphere
-    for i ∈ 1:nstream
-        stream!(I, x, dIdx, I₀, 𝔸, idx, g, 𝓂[i], fT, fμ, tol)
-        #integral over hemisphere: ∫∫ I cos(θ) sin(θ) dθ dϕ, where θ∈[0,π/2], ϕ∈[0,2π]
-        for j ∈ eachindex(M)
-            @inbounds M[j] += 𝒲[i]*I[j] #W = 2π*w*cos(θ)*sin(θ), precomputed
-        end
+    for i ∈ 1:nstream-1
+        stream!(M, x, dIdx, I₀, 𝔸, idx, g, 𝓂[i], fT, fμ, tol)
+        M .*= 𝒲[i]/𝒲[i+1]
     end
+    stream!(M, x, dIdx, I₀, 𝔸, idx, g, 𝓂[end], fT, fμ, tol)
+    M .*= 𝒲[end]
     return nothing
 end
 
 #-------------------------------------------------------------------------------
 # core function for whole atmosphere upward and downward monochromatic fluxes
 
-function fluxᵥ!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
-                M⁺, 
-                P, #pressure coordinates of output
-                𝔸::Q,
-                idx::Int,
-                g::Real, #gravity [m/s^2]
-                fT::R, #temperature profile fT(P)
-                fμ::S, #mean molar mass μ(T,P)
-                fS::U, #incoming stellar radiation fS(ν) [W/m^2]
-                fα::V, #surface albedo fα(ν)
-                nstream::Int, #number of streams to integrate in both directions
-                θₛ::Real, #stellar radiation angle, corresponds to cos(θ) = 2/3
-                tol::Real) where {Q<:AbstractAbsorber,R,S,U,V}
+function monoflux!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
+                   M⁺, #upward monochromatic fluxes [W/m^2/cm^-1]
+                   P, #pressure coordinates of output
+                   ω, #transformed pressure coords
+                   ι, #transformed pressure coords
+                   𝔸::Q,
+                   idx::Int,
+                   g::Real, #gravity [m/s^2]
+                   fT::R, #temperature profile fT(P)
+                   fμ::S, #mean molar mass μ(T,P)
+                   fS::U, #incoming stellar radiation fS(ν) [W/m^2]
+                   fα::V, #surface albedo fα(ν)
+                   nstream::Int, #number of streams to integrate in both directions
+                   θₛ::Real, #stellar radiation angle, corresponds to cos(θ) = 2/3
+                   tol::Real) where {Q<:AbstractAbsorber,R,S,U,V}
+    #setup
     @assert length(M⁻) == length(M⁺) == length(P)
     #surface pressure assuming ascending pressures
     Pₛ = P[end]
@@ -444,16 +441,24 @@ function fluxᵥ!(M⁻, #downward monochromatic fluxes [W/m^2/cm^-1]
     𝓂 = 1/cos(θₛ)
     #downward stellar irradiance at ν
     Iₜ⁻ = fS(ν)
-    #transformed pressure coordinates
-    ω = P2ω.(P)
-    reverse!(ω)
-    ι = P2ι.(P)
-    #downward stellar irradiance throughout atmosphere
-    stream!(M⁻, ι, dIdι, Iₜ⁻, 𝔸, idx, g, 𝓂, fT, fμ, tol)
-    #convert to flux
-    M⁻ .*= cos(θₛ)
-    #add the atmospheric contribution to downward flux
+
+    #===================================
+    downgoing flux throughout atmosphere
+    ===================================#
+    #cosine of the stellar zenith angle
+    c = cos(θₛ)
+    #atmospheric contribution to downward flux
     streams!(M⁻, ι, dIdι, zero(Iₜ⁻), 𝔸, idx, g, fT, fμ, nstream, tol)
+    #divide by c before adding the stellar irradiance in-place
+    M⁻ ./= c
+    #add downward stellar irradiance
+    stream!(M⁻, ι, dIdι, Iₜ⁻, 𝔸, idx, g, 𝓂, fT, fμ, tol)
+    #multiply everything by c to get the true flux
+    M⁻ .*= c
+
+    #===================================
+    upgoing flux throughout atmosphere
+    ===================================#
     #some of the downward stellar flux is reflected
     Iₛ⁺ = M⁻[end]*fα(ν)/π #Lambertian
     #and the surface emits some radiation

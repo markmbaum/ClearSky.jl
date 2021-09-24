@@ -172,16 +172,31 @@ dTdω(ω, T, param::Tuple) = dTdω(ω, T, param...)
 #-------------------------------------------------------------------------------
 #exported wrappers of dTdω
 
-export lapserate
+export lapserate, lapse!
 
 #single-condensible moist lapse rate
-function lapserate(P, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F) where {F}
+function lapserate(T, P, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F) where {F}
     dTdP(P, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F)
 end
 
 #dry lapse rate
-function lapserate(P, T, cₚ, μ)
+function lapserate(T, P, cₚ, μ)
     dTdP(P, T, cₚ, 1, μ, 1, 0, T->0)
+end
+
+function lapse!(T, P, cₚ, μ)
+    @assert length(P) == length(T)
+    idx = sortperm(P, rev=true) #pressure sorting in descending order
+    for i ∈ idx[1:end-1]
+        #expected lapse rate
+        Γₑ = lapserate(T[i], P[i], cₚ, μ)
+        #lapse rate of profile
+        Γₚ = (T[i+1] - T[i])/(P[i+1] - P[i])
+        #heat the upper point if needed
+        if Γₚ > Γₑ
+            T[i+1] = T[i] + Γₑ*(P[i+1] - P[i])
+        end
+    end
 end
 
 #------------------------------------
