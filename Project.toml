@@ -17,7 +17,7 @@ Cubature = "1"
 Faddeyeva985 = "1"
 ProgressMeter = "1"
 QuadGK = "2"
-ScalarRadau = "1"
+ScalarRadau = "1, 2"
 julia = "1.6"
 
 [extras]
