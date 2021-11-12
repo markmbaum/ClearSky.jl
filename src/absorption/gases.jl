@@ -36,6 +36,12 @@ struct AtmosphericDomain
     nP::Int64
 end
 
+function Base.show(io::IO, Ω::AtmosphericDomain)
+    print(io, "AtmosphericDomain:\n")
+    print(io, "  $(Ω.nT) temperature nodes ∈ [$(Ω.Tmin),$(Ω.Tmax)] K\n")
+    print(io, "  $(Ω.nP) pressure nodes ∈ [$(Ω.Pmin),$(Ω.Pmax)] Pa")
+end
+
 function AtmosphericDomain(Trange::NTuple{2,Real}, nT::Int,
                            Prange::NTuple{2,Real}, nP::Int)
     #check for negatives
@@ -67,9 +73,10 @@ end
 # P: pressure grid coordinates [Pa]
 # σ: cross-section grid [cm^2/molecule]
 function OpacityTable(T, P, σ)
-    ζ = all(σ .<= TINY) #whether all values are effectively zero
+    tiny = floatmin(eltype(T))
+    ζ = all(σ .<= tiny) #whether all values are effectively zero
     lnP = log.(P)
-    lnσ = ζ ? fill(log(TINY), size(σ)) : log.(σ)
+    lnσ = ζ ? fill(log(tiny), size(σ)) : log.(σ)
     Φ = BichebyshevInterpolator(T, lnP, lnσ)
     OpacityTable(Φ)
 end
@@ -206,11 +213,13 @@ struct Gas{T,F} <: AbstractGas
 end
 
 function Base.show(io::IO, g::Gas)
-    println("$(g.name) ($(g.formula))")
-    println("  μ = $(round(g.μ, sigdigits=8)) kg/mole")
-    println("  ν: $(minimum(g.ν)) - $(maximum(g.ν)) cm^-1 ($(length(g.ν)) samples)")
-    println("  T: $(g.Ω.Tmin) - $(g.Ω.Tmax) K ($(g.Ω.nT) samples)")
-    println("  P: $(g.Ω.Pmin) - $(g.Ω.Pmax) Pa ($(g.Ω.nP) samples)")
+    print(io, "$(g.name) ($(g.formula))\n")
+    print(io, "  μ = $(round(g.μ, sigdigits=8)) kg/mole\n")
+    print(io, "  ν: $(minimum(g.ν)) - $(maximum(g.ν)) cm^-1 ($(length(g.ν)) samples)\n")
+    Tmin, Tmax = g.Ω.Tmin, g.Ω.Tmax
+    Pmin, Pmax = g.Ω.Pmin, g.Ω.Pmax
+    print(io, "  T: $Tmin - $Tmax K ($(g.Ω.nT) samples)\n")
+    print(io, "  P: $Pmin - $Pmax Pa ($(g.Ω.nP) samples)\n")
 end
 
 function Gas(sl::SpectralLines,
@@ -260,6 +269,11 @@ Furnishes the molar concentration [mole/mole] of a [`Gas`](@ref) object at a par
 """
 concentration(g::Gas, T, P) = g.fC(T,P)
 
+function concentration(g::Gas, T::AbstractVector, P::AbstractVector)
+    @assert length(T) == length(P)
+    [concentration(g, T[i], P[i]) for i ∈ eachindex(P)]
+end
+
 #single concentration-scaled cross-section
 (g::Gas)(i::Int, T, P) = concentration(g, T, P)*rawσ(g, i, T, P)
 
@@ -275,30 +289,72 @@ Create a copy of a [`Gas`](@ref) object with a new molar concentration function,
 
     The self-broadening component of the line shape is not recomputed when using the `reconcentrate` function. This component is generally small when partial pressure is low, but may be appreciable if the concentration changes significantly.
 """
-
-function reconcentrate(g::Gas{U,V}, fC::F)::Gas where {U,V,F}
-    #check for invalid concentrations
+function reconcentrate(g::Gas, fC)::Gas
+    #check for invalid concentrations or unexpected input
     for P ∈ g.Ω.P, T ∈ g.Ω.T
-        @assert 0 <= fC(T,P) <= 1.0 "gas molar concentrations must be in [0,1], not $C, which was encountered at T=$T P=$P"
+        C = try
+            fC(T,P)
+        catch
+            error("concentration function must have the form fC(T,P), where T is temperature [K] and P is pressure [Pa], but something went wrong when the function was evaluated")
+        end
+        @assert 0 <= C <= 1.0 "gas molar concentrations must be in [0,1], not $C, which was encountered at T=$T P=$P"
     end
     #construct a new gas WITHOUT COPYING
-    Gas{U,F}(g.name, g.formula, g.μ, g.ν, g.Ω, g.Π, fC)
+    Gas(g.name, g.formula, g.μ, g.ν, g.Ω, g.Π, fC)
 end
+
+"""
+    reconcentrate(g::Gas, C)
+
+Create a copy of a [`Gas`](@ref) object with a new, **uniform** molar concentration [mole/mole].
+
+!!! warning
+
+    The self-broadening component of the line shape is not recomputed when using the `reconcentrate` function. This component is generally small when partial pressure is low, but may be appreciable if the concentration changes significantly.
+"""
+function reconcentrate(g::Gas, C::Real)::Gas where {U,V}
+    #check for invalid concentrations
+    @assert 0 <= C <= 1.0 "gas molar concentrations must be in [0,1], not $C"
+    #construct a new gas WITHOUT COPYING
+    Gas(g.name, g.formula, g.μ, g.ν, g.Ω, g.Π, (T,P)->float(C))
+end
+
+function Base.getindex(g::Gas, x)
+    Gas(
+        g.name[:],
+        g.formula[:],
+        g.μ,
+        g.ν[x],
+        g.Ω,
+        g.Π[x],
+        g.fC
+    )
+end
+
+Base.firstindex(g::Gas) = 1
+
+Base.lastindex(g::Gas) = length(g.ν)
 
 #---------------------------------------
 
 export GrayGas
 
-struct GrayGas <: AbstractGas
+struct GrayGas{T} <: AbstractGas
     name::String
     formula::String
     μ::Float64
     ν::Vector{Float64}
-    σ::Float64
+    σ::T
+end
+
+function Base.show(io::IO, g::GrayGas)
+    print(io, "Gray Gas\n")
+    print(io, "  ν: $(minimum(g.ν)) - $(maximum(g.ν)) cm^-1 ($(length(g.ν)) samples)\n")
+    print(io, "  σ = $(g.σ) cm^2/molecule")
 end
 
 function GrayGas(σ::Real, ν::AbstractVector{<:Real})
-    GrayGas("gray", "-", NaN, collect(Float64, ν), Float64(σ))
+    GrayGas("Gray", "Gray", NaN, collect(Float64, ν), σ)
 end
 
 (g::GrayGas)(x...) = g.σ

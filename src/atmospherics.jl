@@ -1,5 +1,29 @@
-#minimum pressure in temperature profiles and floor for hydrostatic profile
-const PMIN = 1e-9
+#-------------------------------------------------------------------------------
+#general wrapper for interpolating profiles in log pressure coordinates
+
+export AtmosphericProfile
+
+struct AtmosphericProfile{Q}
+    ϕ::LinearInterpolator{Q,NoBoundaries}
+end
+
+function Base.show(io::IO, ::AtmosphericProfile{Q}) where {Q}
+    print(io, "AtmosphericProfile{$Q}")
+end
+
+Base.copy(x::AtmosphericProfile) = AtmosphericProfile(copy(x.ϕ))
+
+function AtmosphericProfile(P::AbstractVector{<:Real}, y::AbstractVector{Q}) where {Q<:Real}
+    @assert length(P) == length(y) "cannot form AtmosphericProfile with unequal numbers of points"
+    #pressure in ascending order
+    idx = sortperm(P)
+    P = collect(Q, P[idx])
+    y = y[idx]
+    ϕ = LinearInterpolator(log.(P), y, NoBoundaries())
+    AtmosphericProfile(ϕ)
+end
+
+(x::AtmosphericProfile)(P) = x.ϕ(log(P))
 
 #-------------------------------------------------------------------------------
 #constructing generalized hydrostatic pressure profiles and inverting for z
@@ -29,8 +53,8 @@ function dlnPdz(z, lnP, param::Tuple)
     Pₛ, g, fT, fμ = param
     #evaluate temperature and mean molar mass [kg/mole]
     P = exp(lnP)
-    P < PMIN && return zero(lnP)
-    P = min(P, Pₛ) #don't allow tiny numerical dips below Pₛ
+    P < 𝐏ₘᵢₙ && return zero(lnP)
+    P = min(P, Pₛ) #don't allow tiny unphysical dips below Pₛ
     T = fT(P)
     μ = fμ(T, P)
     #evaluate derivative
@@ -56,13 +80,11 @@ from the surface to a height of ``z``, where ``R`` is the [universial gas consta
 """
 function hydrostatic(z, Pₛ, g, fT::T, fμ::U) where {T,U}
     @assert z >= 0 "cannot compute pressure at negative altitude $z m"
-    @assert Pₛ > PMIN "pressure cannot be less than $PMIN Pa"
-    #parameters
+    @assert Pₛ > 𝐏ₘᵢₙ "pressure cannot be less than $𝐏ₘᵢₙ Pa"
+    #integration parameters
     param = (Pₛ, g, fT, fμ)
-    #integrate in log coordinates
-    lnP = radau(dlnPdz, log(Pₛ), 0, z, param)
-    #convert
-    exp(lnP)
+    #integrate in log coordinates and return
+    exp(radau(dlnPdz, log(Pₛ), zero(z), z, param))
 end
 
 """
@@ -81,8 +103,8 @@ Compute the altitude [m] at which a specific hydrostatic pressure occurs using a
 function altitude(P, Pₛ, g, fT::T, fμ::U) where {T,U}
     @assert P < Pₛ "surface pressure must be greater than pressure aloft"
     #pressure decreases monotonically, find altitudes bracketing Pₜ
-    z₁ = 0.0
-    z₂ = 1e2
+    z₁ = zero(P)
+    z₂ = 1e2*one(P)
     P₁ = Pₛ
     P₂ = hydrostatic(z₂, Pₛ, g, fT, fμ)
     while P₂ > P
@@ -92,7 +114,8 @@ function altitude(P, Pₛ, g, fT::T, fμ::U) where {T,U}
         P₂ = hydrostatic(z₂, Pₛ, g, fT, fμ)
     end
     #find precise altitude where P = Pₜ
-    regulafalsi((z,p) -> log(hydrostatic(z, Pₛ, g, fT, fμ)) - log(P), z₁, z₂)
+    fₕ(z,::Any) = log(hydrostatic(z, Pₛ, g, fT, fμ)) - log(P)
+    regulafalsi(fₕ, z₁, z₂)
 end
 
 """
@@ -120,24 +143,27 @@ H = Hydrostatic(1e5, 1, 9.8, M, (T,P)->0.029);
 H.([0, 1e3, 1e4])
 ```
 """
-struct Hydrostatic
-    ϕ::LinearInterpolator{Float64,WeakBoundaries}
-    zₜ::Float64
+struct Hydrostatic{T}
+    ϕ::LinearInterpolator{T,WeakBoundaries}
+    zₜ::T
 end
 
-function Hydrostatic(Pₛ, Pₜ, g, fT::T, fμ::U, N::Int=250) where {T,U}
+function Hydrostatic(Pₛ, Pₜ, g, fT::T, fμ::U, N::Int=100) where {T,U}
+    Pₛ, Pₜ = promote(Pₛ, Pₜ)
     #find the altitude corresponding to Pₜ
     zₜ = altitude(Pₜ, Pₛ, g, fT, fμ)
     #interpolation knots and output array
-    z = logrange(0, zₜ, N)
-    lnP = zeros(Float64, N)
+    z = logrange(zero(zₜ), zₜ, N)
+    lnP = zeros(typeof(Pₛ), N)
+    #integration parameters
+    param = (Pₛ, g, fT, fμ)
     #integrate to get a full pressure profile
-    radau!(lnP, z, dlnPdz, log(Pₛ), 0.0, zₜ, (Pₛ, g, fT, fμ))
+    radau!(lnP, z, dlnPdz, log(Pₛ), zero(zₜ), zₜ, param)
     #construct and return
     Hydrostatic(LinearInterpolator(z, lnP, WeakBoundaries()), zₜ)
 end
 
-(H::Hydrostatic)(z)::Float64 = exp(H.ϕ(z))
+(H::Hydrostatic)(z) = exp(H.ϕ(z))
 
 """
     altitude(H::Hydrostatic, P)
@@ -145,7 +171,7 @@ end
 Compute the altitude at which a specific pressure occurs in a [`Hydrostatic`](@ref) pressure profile. A root finder is applied to the object.
 """
 function altitude(H::Hydrostatic, P::Real)::Float64
-    regulafalsi((z,p) -> log(H(z)) - log(P), 0.0, H.zₜ)
+    regulafalsi((z,p) -> log(H(z)) - log(P), zero(H.zₜ), H.zₜ)
 end
 
 #-------------------------------------------------------------------------------
@@ -157,16 +183,21 @@ function dTdP(P, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F) where {F}
     #specific gas constants
     Rₙ = 𝐑/μₙ
     Rᵥ = 𝐑/μᵥ
-    #whole expression at once
-    (T/P)*(Rₙ/cₚₙ)*(1 + α*L/(Rₙ*T))/(1 + α*(cₚᵥ/cₚₙ + (L/(T*Rᵥ) - 1)*L/(cₚₙ*T)))
+    #numerator
+    𝑵 = 1.0 + α*L/(Rₙ*T)
+    #denominator
+    𝑫 = 1.0 + α*(cₚᵥ/cₚₙ + (L/(T*Rᵥ) - 1.0)*L/(cₚₙ*T))
+    #final expression
+    (T/P)*(Rₙ/cₚₙ)*(𝑵/𝑫)
 end
 
 #same function in ω coordinates
 function dTdω(ω, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F) where {F}
-    -ω2P(ω)*dTdP(ω2P(ω), T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F)
+    P = ω2P(ω)
+    -dωfac(P)*dTdP(P, T, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F)
 end
 
-#slurp up the parameters for integrations
+#slurp up the parameters for integration
 dTdω(ω, T, param::Tuple) = dTdω(ω, T, param...)
 
 #-------------------------------------------------------------------------------
@@ -181,20 +212,21 @@ end
 
 #dry lapse rate
 function lapserate(T, P, cₚ, μ)
-    dTdP(P, T, cₚ, 1, μ, 1, 0, T->0)
+    dTdP(P, T, cₚ, 1.0, μ, 1.0, 0.0, T->0.0)
 end
 
 function lapse!(T, P, cₚ, μ)
     @assert length(P) == length(T)
     idx = sortperm(P, rev=true) #pressure sorting in descending order
-    for i ∈ idx[1:end-1]
+    for n ∈ 1:length(idx)-1
+        i, j = idx[n], idx[n+1]
         #expected lapse rate
         Γₑ = lapserate(T[i], P[i], cₚ, μ)
         #lapse rate of profile
-        Γₚ = (T[i+1] - T[i])/(P[i+1] - P[i])
+        Γₚ = (T[j] - T[i])/(P[j] - P[i])
         #heat the upper point if needed
         if Γₚ > Γₑ
-            T[i+1] = T[i] + Γₑ*(P[i+1] - P[i])
+            T[j] = T[i] + Γₑ*(P[j] - P[i])
         end
     end
 end
@@ -206,9 +238,12 @@ abstract type AbstractAdiabat end
 export MoistAdiabat, DryAdiabat
 export tropopause
 
-function checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
+function checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo, smooth)
     @assert Pₛ > Pₜ "Pₛ must be greater than Pₜ"
     @assert Pₜ > 0 "Pₜ must be greater than 0"
+    @assert Tstrat >= 0 "stratosphere temperature cannot be negative"
+    @assert Ptropo >= 0 "tropopause pressure cannot be negative"
+    @assert smooth >= 0 "smoothing distance cannot be negative"
     if Tstrat > 0
         @assert Tstrat < Tₛ "Tstrat cannot be greater than Tₛ"
     end
@@ -224,7 +259,7 @@ end
 
 # Constructor
 
-    DryAdiabat(Tₛ, Pₛ, cₚ, μ; Tstrat=0.0, Ptropo=0.0, Pₜ=$PMIN)
+    DryAdiabat(Tₛ, Pₛ, cₚ, μ; Tstrat=0.0, Ptropo=0.0, Pₜ=$𝐏ₘᵢₙ)
 
 * `Tₛ`: surface temperature [K]
 * `Pₛ`: surface pressure [K]
@@ -260,14 +295,55 @@ struct DryAdiabat{U} <: AbstractAdiabat
     μ::U
     Tstrat::U
     Ptropo::U
+    #smoothing quantities
+    smooth::U #smoothing distance
+    T₂::U #temperature at beginning of smoothing
+    h₂::U #hermite thing at T₂
 end
 
-function DryAdiabat(Tₛ, Pₛ, cₚ, μ; Tstrat=0, Ptropo=0, Pₜ=PMIN)
-    checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
-    Tₛ = float(Tₛ)
-    Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo = promote(Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo)
-    DryAdiabat(Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo)
+function Base.show(io::IO, Γ::DryAdiabat{T}) where {T}
+    print(io, "DryAdiabat{$T}:\n")
+    print(io, "  Tₛ     = $(Γ.Tₛ) K\n")
+    print(io, "  Pₛ     = $(Γ.Pₛ) Pa\n")
+    print(io, "  cₚ     = $(Γ.cₚ) J/kg/K\n")
+    print(io, "  μ      = $(Γ.μ) kg/mole\n")
+    if (Γ.Tstrat != 0) & (Γ.Ptropo != 0)
+        Tstrat = round(Γ.Tstrat, sigdigits=6)
+        print(io, "  Tstrat = $Tstrat K\n")
+        Ptropo = round(Γ.Ptropo, sigdigits=6)
+        print(io, "  Ptropo = $Ptropo Pa\n")
+        print(io, "  smoothing interval of $(Γ.smooth) Pa")
+    end
 end
+
+function DryAdiabat(Tₛ, Pₛ, cₚ, μ;
+                    Tstrat=0.0,
+                    Ptropo=0.0,
+                    smooth=1e2,
+                    Pₜ=𝐏ₘᵢₙ)
+    checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo, smooth)
+    #fill in Tstrat or Ptropo if needed
+    if Tstrat != 0
+        Ptropo = regulafalsi((P,_) -> temperature(P, Tₛ, Pₛ, cₚ, μ) - Tstrat, Pₛ, Pₜ)
+    elseif Ptropo != 0
+        Tstrat = temperature(Ptropo, Tₛ, Pₛ, cₚ, μ)
+    end
+    #get smoothing connection ready if Ptropo is nonzero
+    h₂ = zero(Tₛ)
+    T₂ = zero(Tₛ)
+    if Ptropo != 0
+        P₂ = Ptropo + smooth
+        T₂ = temperature(P₂, Tₛ, Pₛ, cₚ, μ)
+        T₂′ = lapserate(T₂, P₂, cₚ, μ)
+        h₂ = smooth*T₂′
+    end
+    DryAdiabat(promote(Tₛ, Pₛ, Pₜ, cₚ, μ, Tstrat, Ptropo, smooth, T₂, h₂)...)
+end
+
+#direct calculation of raw temperature profile
+temperature(P, Tₛ, Pₛ, cₚ, μ) = Tₛ*(P/Pₛ)^(𝐑/(μ*cₚ))
+
+temperature(Γ::DryAdiabat, P) = temperature(P, Γ.Tₛ, Γ.Pₛ, Γ.cₚ, Γ.μ)
 
 #------------------------------------
 
@@ -276,7 +352,7 @@ end
 
 # Constructor
 
-    MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat; Tstrat=0, Ptropo=0, N=1000, Pₜ=$PMIN)
+    MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat; Tstrat=0, Ptropo=0, N=1000, Pₜ=$𝐏ₘᵢₙ)
 
 * `Tₛ`: surface temperature [K]
 * `Pₛ`: surface pressure [K]
@@ -322,18 +398,39 @@ struct MoistAdiabat{U} <: AbstractAdiabat
     Pₜ::U
     Tstrat::U
     Ptropo::U
+    #smoothing quantities
+    smooth::U #smoothing distance
+    T₂::U #temperature at beginning of smoothing
+    h₂::U #hermite thing at T₂
+end
+
+function Base.show(io::IO, Γ::MoistAdiabat{T}) where {T}
+    print(io, "MoistAdiabat{$T}:\n")
+    print(io, "  Tₛ     = $(Γ(Γ.Pₛ)) K\n")
+    print(io, "  Pₛ     = $(Γ.Pₛ) Pa\n")
+    if (Γ.Tstrat != 0) & (Γ.Ptropo != 0)
+        Tstrat = round(Γ.Tstrat, sigdigits=6)
+        print(io, "  Tstrat = $Tstrat K\n")
+        Ptropo = round(Γ.Ptropo, sigdigits=6)
+        print(io, "  Ptropo = $Ptropo Pa\n")
+        print(io, "  smoothing interval of $(Γ.smooth) Pa")
+    end
+end
+
+function Base.copy(Γ::MoistAdiabat)
+    MoistAdiabat(copy(Γ.ϕ), Γ.Pₛ, Γ.Pₜ, Γ.Tstrat, Γ.Ptropo, Γ.smooth, Γ.T₂, Γ.h₂)
 end
 
 function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F;
                       Tstrat=0.0,
                       Ptropo=0.0,
-                      N::Int=200,
-                      Pₜ=PMIN) where {F}
+                      smooth=1e2,
+                      N::Int=100,
+                      Pₜ=𝐏ₘᵢₙ) where {F}
     #basic checks
-    checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
+    checkadiabat(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo, smooth)
     #type uniformity
-    Tₛ = float(Tₛ)
-    Tₛ, Pₛ, Pₜ, Tstrat, Ptropo = promote(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo)
+    Tₛ, Pₛ, Pₜ, Tstrat, Ptropo, smooth = promote(Tₛ, Pₛ, Pₜ, Tstrat, Ptropo, smooth)
     #interpolation knots and output vector
     ω₁, ω₂ = P2ω(Pₛ, Pₜ)
     ω = logrange(ω₁, ω₂, N)
@@ -342,34 +439,64 @@ function MoistAdiabat(Tₛ, Pₛ, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat::F;
     param = (cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat)
     #integrate with in-place dense output
     radau!(T, ω, dTdω, Tₛ, ω[1], ω[end], param)
-    #natural spline in log pressure coordinates
+    #interpolator ω pressure coordinates
     ϕ = LinearInterpolator(ω, T, WeakBoundaries())
-    MoistAdiabat(ϕ, Pₛ, Pₜ, Tstrat, Ptropo)
+    #fill in Tstrat or Ptropo if needed
+    if Tstrat != 0
+        Ptropo = regulafalsi((P,_) -> temperature(ϕ, P) - Tstrat, Pₛ, Pₜ)
+    elseif Ptropo != 0
+        Tstrat = temperature(ϕ, Ptropo)
+    end
+    #get smoothing connection ready if Ptropo is nonzero
+    h₂ = zero(Tₛ)
+    T₂ = zero(Tₛ)
+    if Ptropo != 0
+        P₂ = Ptropo + smooth
+        T₂ = temperature(ϕ, P₂)
+        T₂′ = lapserate(T₂, P₂, cₚₙ, cₚᵥ, μₙ, μᵥ, L, psat)
+        h₂ = smooth*T₂′
+    end
+    MoistAdiabat(ϕ, Pₛ, Pₜ, Tstrat, Ptropo, smooth, T₂, h₂)
 end
+
+#direct calculation of raw temperature profile
+temperature(ϕ::LinearInterpolator, P) = ϕ(P2ω(P))
+
+temperature(Γ::MoistAdiabat, P) = temperature(Γ.ϕ, P)
 
 #------------------------------------
 #general operations with an adiabat
 
-#direct calculation without temperature/pressure floors
-temperature(Γ::DryAdiabat, P) = Γ.Tₛ*(P/Γ.Pₛ)^(𝐑/(Γ.μ*Γ.cₚ))
-
-#direct calculation without temperature/pressure floors
-temperature(Γ::MoistAdiabat, P) = Γ.ϕ(P2ω(P))
-
 #find the pressure corresponding to a temperature, ignoring Tstrat & Ptropo
 function pressure(Γ::AbstractAdiabat, T)
+    #surface temperature
     Tₛ = temperature(Γ, Γ.Pₛ)
+    #TOA temperature (at very tiny pressure) 
     Tₜ = temperature(Γ, Γ.Pₜ)
+    #T profile should always decrease with P, so demand bracketing
     @assert Tₛ >= T >= Tₜ "temperature $T K out of adiabat range [$(Tₛ),$(Tₜ)] K"
-    regulafalsi((P,p) -> temperature(Γ, P) - T, Γ.Pₛ, Γ.Pₜ)
+    #find the root with false position
+    regulafalsi((P,::Any) -> temperature(Γ, P) - T, Γ.Pₛ, Γ.Pₜ)
 end
 
 function (Γ::AbstractAdiabat)(P)
-    #check if pressure is below tropopause
-    P < Γ.Ptropo && return temperature(Γ, Γ.Ptropo)
-    #what the temperature would be without any floor
+    #return tropopause temperature if P is below Ptropo
+    P < Γ.Ptropo && return Γ.Tstrat*one(P)
+    #check if P is inside the smoothing region 
+    if (Γ.Ptropo != 0) & (Γ.smooth != 0)
+        P₁ = Γ.Ptropo
+        if Γ.Ptropo < P < P₁ + Γ.smooth
+            ψ = (P - Γ.Ptropo)/Γ.smooth
+            T₁ = Γ.Tstrat
+            T₂ = Γ.T₂
+            h₂ = Γ.h₂
+            #smooth cubic connection
+            return ψ^3*(2*T₁ - 2*T₂ + h₂) + ψ^2*(-3*T₁ + 3*T₂ - h₂) + T₁
+        end
+    end
+    #raw temperature from the profile, unadjusted
     T = temperature(Γ, P)
-    #apply the floor, if desired
+    #return stratosphere temperature if T is below Tstrat
     T < Γ.Tstrat && return Γ.Tstrat
     #ensure positive
     @assert T > 0 "non-positive temperature ($T K) encountered in adiabat at $P Pa"
@@ -382,8 +509,7 @@ end
 Compute the temperature [K] and pressure [Pa] at which the tropopause occurs in an adiabatic temperature profile. This function can be called on a `DryAdiabat` or a `MoistAdiabat` if it was constructed with nonzero `Tstrat` or `Ptropo`. Returns the tuple `(T,P)`.
 """
 function tropopause(Γ::AbstractAdiabat)
-    Γ.Ptropo != 0 && return temperature(Γ, Γ.Ptropo), Γ.Ptropo
-    Γ.Tstrat != 0 && return Γ.Tstrat, pressure(Γ, Γ.Tstrat)
+    Γ.Ptropo != 0 && Γ.Tstrat != 0 && return (Γ.Tstrat,Γ.Ptropo)
     error("no stratosphere temperature or pressure has been defined (Tstrat/Ptropo)")
 end
 
@@ -471,7 +597,7 @@ function condensibleprofile(Γ::AbstractAdiabat, fPₛ::F)::Function where {F}
     Pₛₜ = fPₛ(Tₜ)
     #create concentration function and return it
     let (Pₜ, Pₛₜ) = (Pₜ, Pₛₜ)
-        function(T, P)
+        function (T, P)
             if P >= Pₜ
                 Pₛ = fPₛ(T)
                 C = Pₛ/(Pₛ + P)
@@ -489,11 +615,9 @@ end
 
 Create a new concentration function for a [`Gas`](@ref) and use it to [`reconcentrate`](@the gas). This does not automatically copy gas data.
 """
-function reconcentrate(G::Gas, Γ::AbstractAdiabat, fPₛ)::Gas
-    #construct the concentration function
-    C = condensibleprofile(Γ, fPₛ)
+function reconcentrate(g::Gas, Γ::AbstractAdiabat, fPₛ)::Gas
     #assign the gas a new concentration profile
-    reconcentrate(G, C)
+    reconcentrate(g, condensibleprofile(Γ, fPₛ))
 end
 
 export haircut!

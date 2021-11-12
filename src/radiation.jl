@@ -34,7 +34,7 @@ Convert frequency [1/s] to wavelength [m]
 f2λ(f) = f/𝐜
 
 #-------------------------------------------------------------------------------
-export planck, normplanck, stefanboltzmann, equilibriumtemperature
+export planck, normplanck, dplanck, stefanboltzmann, equilibriumtemperature
 
 """
     planck(ν, T)
@@ -45,7 +45,13 @@ Compute black body intensity [W/m``^2``/cm``^{-1}``/sr] using [Planck's law](htt
 * `ν`: wavenumger [cm``^{-1}``]
 * `T`: temperature [Kelvin]
 """
-planck(ν, T) = 100*2*𝐡*𝐜^2*(100*ν)^3/(exp(𝐡*𝐜*(100*ν)/(𝐤*T)) - 1)
+function planck(ν, T)
+    νₘ = 100.0*ν #convert from cm^-1 to m^-1
+    x = 𝐡*𝐜*νₘ/(𝐤*T) #exponent
+    p = 2*𝐡*𝐜^2*νₘ^3 #prefactor
+    #result, converting back to cm^-1 with the factor of 100
+    100.0*p/(exp(x) - 1.0)
+end
 
 """
     normplanck(ν, T)
@@ -65,11 +71,28 @@ yielding units of 1/cm``^{-1}``/sr.
 normplanck(ν, T) = planck(ν, T)/stefanboltzmann(T)
 
 """
+    dplanck(ν, T)
+
+Evaluates ``\\frac{\\partial B}{\\partial T}``
+"""
+function dplanck(ν, T)
+    νₘ = 100.0*ν #convert from cm^-1 to m^-1
+    x = 𝐡*𝐜*νₘ/(𝐤*T) #exponent
+    y = exp(x)
+    if isinf(y)
+        return zero(y) #fail accurately, Inf/(Inf - 1)^2 → 0
+    end
+    p = 2*𝐡^2*𝐜^3*νₘ^4/(𝐤*T^2) #prefactor
+    #result, converting back to cm^-1 with the factor of 100
+    100.0*p*y/(y - 1)^2
+end
+
+"""
     stefanboltzmann(T)
 
 Compute black body radiation power using the [Stefan-Boltzmann](https://en.wikipedia.org/wiki/Stefan%E2%80%93Boltzmann_law) law, ``σT^4`` [W/m``^2``].
 """
-stefanboltzmann(T) = 𝛔*T^4
+stefanboltzmann(T) = 𝛔*(T^4)
 
 """
     equilibriumtemperature(F, A)
@@ -99,7 +122,7 @@ Compute the [planetary equilibrium temperature](https://en.wikipedia.org/wiki/Pl
 equilibriumtemperature(L, A, R) = (L*(1 - A)/(16*𝛔*π*R^2))^(1/4)
 
 #-------------------------------------------------------------------------------
-export dτdP, transmittance, schwarzschild
+export dτdP, transmittance, schwarzschild, absorption, emission
 
 """
     dτdP(σ, g, μ)
@@ -115,7 +138,7 @@ where ``N_A`` is Avogadro's number.
 * `g`: gravitational acceleration [m/s``^2``]
 * `μ`: mean molar mass [kg/mole]
 """
-dτdP(σ, g, μ) = 1e-4*σ*(𝐍𝐚/(μ*g))
+dτdP(σ, g, μ) = 1e-4*σ*𝐍𝐚/(μ*g)
 
 """
     transmittance(τ)
@@ -160,3 +183,38 @@ where ``B_ν`` is [`planck`](@ref)'s law and ``N_A`` is Avogadro's number.
 * `T`: temperature [K]
 """
 schwarzschild(I, ν, σ, g, μ, T) = 1e-4*σ*(𝐍𝐚/(μ*g))*(planck(ν,T) - I)
+
+"""
+    absorption(I, σ, g, μ)
+
+Evaluate the [Schwarzschild differential equation](https://en.wikipedia.org/wiki/Schwarzschild%27s_equation_for_radiative_transfer) for radiative transfer with pressure units [Pa] and assuming the ideal gas law, but **without Planck emission**. This can be useful if the wavenumber is far away from the emission region of the temperature and the Planck emission is known to be negligible.
+
+``\\frac{dI}{dP} = -σ\\frac{\\textrm{N}_A}{g μ}I``
+
+where ``N_A`` is Avogadro's number.
+
+# Arguments
+* `I`: radiative intensity [W/m``^2``/cm``^{-1}``/sr]
+* `σ`: absorption cross-section [cm``^2``/molecule]
+* `g`: gravitational acceleration [m/s``^2``]
+* `μ`: mean molar mass [kg/mole]
+"""
+absorption(I, σ, g, μ) = -1e-4*σ*(𝐍𝐚/(μ*g))*I
+
+"""
+    emission(I, ν, σ, g, μ, T)
+
+Evaluate the [Schwarzschild differential equation](https://en.wikipedia.org/wiki/Schwarzschild%27s_equation_for_radiative_transfer) for radiative transfer with pressure units [Pa] and assuming the ideal gas law, but **without Planck emission**. This can be useful if the wavenumber is far away from the emission region of the temperature and the Planck emission is known to be negligible.
+
+``\\frac{dI}{dP} = -σ\\frac{\\textrm{N}_A}{g μ}B_ν(T)``
+
+where ``B_ν`` is [`planck`](@ref)'s law
+
+# Arguments
+* `I`: radiative intensity [W/m``^2``/cm``^{-1}``/sr]
+* `σ`: absorption cross-section [cm``^2``/molecule]
+* `g`: gravitational acceleration [m/s``^2``]
+* `μ`: mean molar mass [kg/mole]
+"""
+emission(ν, σ, g, μ, T) = 1e-4*σ*(𝐍𝐚/(μ*g))*planck(ν,T)
+

@@ -4,7 +4,7 @@ using Base.Threads: @threads
 using Test
 
 using ClearSky
-using ClearSky: stream, dIdω, P2ω
+using ClearSky: 𝓇stream, dIdω, P2ω
 
 const R = 8.31446262
 

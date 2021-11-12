@@ -16,11 +16,12 @@ const 𝐍𝐚 = 6.02214076e23
 const 𝐃𝐚 = 1.66053907e-27
 #gravitational constant [m^3/kg/s^2]
 const 𝐆 = 6.6743e-11
+#the Loschmidt number, but in molecules/cm^3 then squared [molecules^2/cm^6]
+const 𝐋𝐨² = 7.21879268e38
 
 #reference temperature of HITRAN database [K]
 const 𝐓ᵣ = 296.0
 #reference temperature [K] equivalent to 0 degrees Celsius
 const 𝐓₀ = 273.15
-
-#smallest Float64 available
-const TINY = floatmin(Float64)
+#minimum pressure for certain temperature/pressure profiles
+const 𝐏ₘᵢₙ = 1e-9

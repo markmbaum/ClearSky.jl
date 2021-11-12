@@ -1,43 +1,8 @@
 #precompute a few numbers
-const sqπ = √π
-const osqπln2 = 1/sqrt(π/log(2.0))
-const sqln2 = sqrt(log(2.0))
-const c2 = 100.0*𝐡*𝐜/𝐤
-
-#-------------------------------------------------------------------------------
-# struct for molecule parameters
-
-struct MolParam
-    #molecule number
-    M::Int64
-    #molecular formula
-    formula::String
-    #molecule name
-    name::String
-    #global isotopologue codes
-    I::Vector{Int64}
-    #isopologue formulae
-    isoform::Vector{String}
-    #AFGL isotopologue codes
-    AFGL::Vector{Int64}
-    #abundance fractions
-    A::Vector{Float64}
-    #molecular masses [kg/mole]
-    μ::Vector{Float64}
-    #Qref
-    Qref::Vector{Float64}
-    #flag, has interpolating chebyshev polynomial
-    hascheb::Vector{Bool}
-    #length of cheby polys
-    ncheb::Vector{Int64}
-    #maximum rel err of cheb polys
-    maxrelerr::Vector{Float64}
-    #chebyshev expansion coefficients
-    cheb::Vector{Vector{Float64}}
-end
-
-#for empty structs
-MolParam() = MolParam(-1, "", "", [], [], [], [], [], [], [], [], [], [])
+const 𝐬𝐪𝛑 = √π
+const 𝐨𝐬𝐪𝛑𝐥𝐧2 = 1/sqrt(π/log(2.0))
+const 𝐬𝐪𝐥𝐧2 = sqrt(log(2.0))
+const 𝐜₂ = 100.0*𝐡*𝐜/𝐤
 
 #-------------------------------------------------------------------------------
 # wavenumber truncation of line shapes
@@ -141,8 +106,8 @@ Compute the [temperature scaling for line intensity](https://hitran.org/docs/def
 """
 function scaleintensity(S, νl, Epp, M::Int16, I::Int16, T)
     #arguments to exp
-    a = -c2*Epp
-    b = -c2*νl
+    a = -𝐜₂*Epp
+    b = -𝐜₂*νl
     #numerator and denominator
     n = exp(a/T)*(1 - exp(b/T))
     d = exp(a/𝐓ᵣ)*(1 - exp(b/𝐓ᵣ))
@@ -192,7 +157,7 @@ Evaluate doppler (gaussian) profile
 * `νl`: wavenumber of absorption line [cm``^{-1}``]
 * `α`: doppler (gaussian) broadening coefficient
 """
-fdoppler(ν, νl, α) = exp(-(ν - νl)^2/α^2)/(α*sqπ)
+fdoppler(ν, νl, α) = exp(-(ν - νl)^2/α^2)/(α*𝐬𝐪𝛑)
 
 """
     doppler(ν, νl, S, α)
@@ -402,14 +367,14 @@ function fvoigt(ν, νl, α, γ)
     #inverse of the doppler parameter
     β = 1/α
     #factor for real and complex parts of Faddeeva args, avoiding β division
-    d = sqln2*β
+    d = 𝐬𝐪𝐥𝐧2*β
     #arguments to Faddeeva function
     x = (ν - νl)*d
     y = γ*d
     #evaluate real part of Faddeeva function
     f = faddeyeva(x,y)
     #final calculation, avoiding α division by using β again
-    osqπln2*β*f
+    𝐨𝐬𝐪𝛑𝐥𝐧2*β*f
 end
 
 """

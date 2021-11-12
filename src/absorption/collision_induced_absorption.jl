@@ -276,9 +276,6 @@ end
 
 export cia, cia!
 
-#the Loschmidt number, but in molecules/cm^3 then squared [molecules^2/cm^6]
-const Locmsq = 7.21879268e38
-
 """
     cia(k, T, Pₐ, P₁, P₂)
 
@@ -298,7 +295,7 @@ function cia(k, T, Pₐ, P₁, P₂)
     #number density of air, in molecules/cm^3
     ρₐ = 1e-6*Pₐ/(𝐤*T)
     #σ in cm^2/molecule, converting k from cm^5/molecule^2 to cm^-1/amagat^2
-    (k*Locmsq)*ρ₁*ρ₂/ρₐ
+    (k*𝐋𝐨²)*ρ₁*ρ₂/ρₐ
 end
 
 """

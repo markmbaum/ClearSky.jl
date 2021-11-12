@@ -1,5 +1,8 @@
 export readpar, SpectralLines
 
+#-------------------------------------------------------------------------------
+#mappin between isotopologue labels and integer indices
+
 const ISOINDEX = Dict{Char,Int64}(
     '1'=>1,  '2'=>2,  '3'=>3,  '4'=>4,  '5'=>5,  '6'=>6,
     '7'=>7,  '8'=>8,  '9'=>9,  '0'=>10, 'A'=>11, 'B'=>12,
@@ -8,6 +11,43 @@ const ISOINDEX = Dict{Char,Int64}(
     'O'=>25, 'P'=>26, 'Q'=>27, 'R'=>28, 'S'=>29, 'T'=>30,
     'U'=>31, 'V'=>32, 'W'=>33, 'X'=>34, 'Y'=>35, 'Z'=>36
 )
+
+#-------------------------------------------------------------------------------
+# struct for molecule parameters
+
+struct MolParam
+    #molecule number
+    M::Int64
+    #molecular formula
+    formula::String
+    #molecule name
+    name::String
+    #global isotopologue codes
+    I::Vector{Int64}
+    #isopologue formulae
+    isoform::Vector{String}
+    #AFGL isotopologue codes
+    AFGL::Vector{Int64}
+    #abundance fractions
+    A::Vector{Float64}
+    #molecular masses [kg/mole]
+    μ::Vector{Float64}
+    #Qref
+    Qref::Vector{Float64}
+    #flag, has interpolating chebyshev polynomial
+    hascheb::Vector{Bool}
+    #length of cheby polys
+    ncheb::Vector{Int64}
+    #maximum rel err of cheb polys
+    maxrelerr::Vector{Float64}
+    #chebyshev expansion coefficients
+    cheb::Vector{Vector{Float64}}
+end
+
+#for empty structs
+MolParam() = MolParam(-1, "", "", [], [], [], [], [], [], [], [], [], [])
+
+#-------------------------------------------------------------------------------
 
 """
     readpar(filename; νmin=0, νmax=Inf, Scut=0, I=[], maxlines=-1, progress=true)
