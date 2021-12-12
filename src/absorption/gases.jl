@@ -358,3 +358,29 @@ function GrayGas(σ::Real, ν::AbstractVector{<:Real})
 end
 
 (g::GrayGas)(x...) = g.σ
+
+#---------------------------------------
+
+export SemiGrayGas
+
+struct SemiGrayGas{T} <: AbstractGas
+    name::String
+    formula::String
+    μ::Float64
+    ν::Vector{Float64}
+    νcut::Float64
+    σ::T
+end
+
+function Base.show(io::IO, g::SemiGrayGas)
+    println(io, "Semi-Gray Gas")
+    println(io, "  ν: $(minimum(g.ν)) - $(maximum(g.ν)) cm^-1 ($(length(g.ν)) samples)")
+    println(io, "  σ = $(g.σ) cm^2/molecule")
+    print(io, "  absorption cutoff = $(g.νcut) cm^-1")
+end
+
+function SemiGrayGas(σ::Real, ν::AbstractVector{<:Real}, νcut::Real)
+    SemiGrayGas("SemiGray", "SemiGray", NaN, collect(Float64, ν), Float64(νcut), σ)
+end
+
+(g::SemiGrayGas)(i::Int, _...) = (g.ν[i] <= g.νcut) ? g.σ : zero(g.σ)

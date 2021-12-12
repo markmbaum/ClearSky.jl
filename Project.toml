@@ -19,12 +19,7 @@ BasicInterpolators = "0.6"
 Cubature = "1"
 Faddeyeva985 = "1"
 ProgressMeter = "1"
-<<<<<<< HEAD
 ScalarRadau = "2"
-=======
-QuadGK = "2"
-ScalarRadau = "1, 2"
->>>>>>> 0e236fe0efc2f41f73a0c981e6f017846e10c7c8
 julia = "1.6"
 
 [extras]

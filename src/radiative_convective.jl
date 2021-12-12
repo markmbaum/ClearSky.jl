@@ -49,7 +49,7 @@ function RCM(Pₑ::AbstractVector{<:Real},
              cₛ::Real,
              absorbers...;
              core::AbstractNumericalCore=Discretized(),
-             nrad::Int=2)
+             radmul::Int=2)
     #demand pressure coordiantes are ascending
     W = typeof(float(Tₑ[1]))
     idx = sortperm(Pₑ)
@@ -68,16 +68,17 @@ function RCM(Pₑ::AbstractVector{<:Real},
     P[end] = Pₑ[end]
     T[end] = Tₑ[end]
     #build up extra radiative nodes with weighted averaging
-    @assert ((nrad % 2 == 0) | (nrad == 1)) "nrad must be an even integer or 1"
-    Pᵣ = similar(Pₑ, nrad*(np-1) + 1)
+    @assert ((radmul % 2 == 0) | (radmul == 1)) "radmul must be an even integer or 1"
+    nrad = radmul*(np - 1) + 1
+    Pᵣ = similar(Pₑ, nrad)
     P₁ = @view Pₑ[1:end-1]
     Pᵣ[1:np-1] .= P₁
     P₂ = @view Pₑ[2:end]
     i = np
-    for j ∈ 2:nrad
+    for j ∈ 2:radmul
         w₁ = j - 1
-        w₂ = nrad - w₁
-        @. Pᵣ[i:i+np-2] = (w₁*P₁ + w₂*P₂)/nrad
+        w₂ = radmul - w₁
+        @. Pᵣ[i:i+np-2] = (w₁*P₁ + w₂*P₂)/radmul
         i += np - 1
     end
     Pᵣ[end] = Pₑ[end]
@@ -90,7 +91,7 @@ function RCM(Pₑ::AbstractVector{<:Real},
     cₛ = convert(W, cₛ)
     g = convert(W, g)
     #make room for radiative calculations
-    F = FluxPack(nrad*(np-1) + 1, nν, W)
+    F = FluxPack(nrad, nν, W)
     #cross-section update tracker
     nᵤ = zeros(Int64, np)
     #make room for heating calculations
@@ -137,6 +138,7 @@ function heating!(ℛ::RCM, δᵤ::Real=1)::Nothing
     end
     #surface heating
     H[end] = R[end]/cₛ
+    #H[end] = (F.F⁺[1] - F.F⁻[end])/cₛ
 
     return nothing
 end

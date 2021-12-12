@@ -133,18 +133,18 @@ function 𝒹depth(P::AbstractVector{<:Real}, #ascending
     return τ
 end
 
-function 𝒹depth!(τ::AbstractVector{<:Real}, #to be filled
+function 𝒹depth!(τ::AbstractVector{Q}, #to be filled
                  P::AbstractVector{<:Real}, #ascending
                  T::Matrix{<:Real}, #evaluated at Lobatto nodes
                  μ::Matrix{<:Real}, #evaluated at Lobatto nodes
-                 𝒜::Q,
+                 𝒜::R,
                  idx::Int,
                  C::Real,
-                 nlobatto::Int)::Nothing where {Q<:AbstractAbsorber}
+                 nlobatto::Int)::Nothing where {Q<:Real,R<:AbstractAbsorber}
     #setup
     np = length(P)
     𝓍, 𝓌 = lobattonodes(nlobatto)
-    τmin = 1e-6*one(eltype(τ))
+    τmin = 1e-6*one(Q)
 
     #first quadrature point
     β₁ = 𝜷(P[1], T[1,1], μ[1,1], C, idx, 𝒜)
@@ -154,7 +154,7 @@ function 𝒹depth!(τ::AbstractVector{<:Real}, #to be filled
         P₁, P₂ = P[i], P[i+1]
         ΔP = P₂ - P₁
         #integrate optical depth over layer with Gauss-Lobotto quadrature
-        τᵢ = zero(eltype(τ))
+        τᵢ = zero(Q)
         #first β is reused from end of previous layer
         τᵢ += (ΔP*𝓌[1])*β₁
         for n ∈ 2:nlobatto-1
@@ -246,17 +246,17 @@ end
 #-------------------------------------------------------------------------------
 # core function for whole atmosphere upward and downward monochromatic fluxes
 
-function 𝒹monoflux!(M⁺, #downward monochromatic fluxes [W/m^2/cm^-1]
-                    M⁻, #upward monochromatic fluxes [W/m^2/cm^-1]
-                    τ, #optical depth of each layer [-] length(P) - 1
+function 𝒹monoflux!(M⁺::AbstractVector{Q}, #downward monochromatic fluxes [W/m^2/cm^-1]
+                    M⁻::AbstractVector{Q}, #upward monochromatic fluxes [W/m^2/cm^-1]
+                    τ::AbstractVector{Q}, #optical depth of each layer [-] length(P) - 1
                     P::AbstractVector{<:Real}, #pressure coordinates of output
                     B::AbstractVector{<:Real}, #pre-evaluated Planck at P coordinates
                     ν::Real,
-                    fS::Q, #incoming stellar radiation fS(ν) [W/m^2]
-                    fa::R, #surface albedo fa(ν)
+                    fS::R, #incoming stellar radiation fS(ν) [W/m^2]
+                    fa::S, #surface albedo fa(ν)
                     θₛ::Real, #stellar radiation angle, corresponds to cos(θ) = 2/3
                     nstream::Int #number of streams to integrate in both directions
-                    )::Nothing where {Q,R}
+                    )::Nothing where {Q,R,S}
     #setup
     np = length(P)
     #number of layers
@@ -271,33 +271,35 @@ function 𝒹monoflux!(M⁺, #downward monochromatic fluxes [W/m^2/cm^-1]
     #avoid possible interpolator race conditions
     fS, fa = copyprofiles(fS, fa)
     #wipe any previous values
-    M⁺[:] .= zero(eltype(M⁺))
-    M⁻[:] .= zero(eltype(M⁻))
+    @inbounds for i ∈ 1:np
+        M⁺[i] = zero(Q)
+        M⁻[i] = zero(Q)
+    end
 
     #=============================
     #downward atmospheric emission
     =============================#
     @inbounds for k ∈ 1:nstream
         #initial irradiance
-        I = zero(eltype(M⁻))
+        I = zero(Q)
+        𝓂ₖ = 𝓂[k]
+        𝒲ₖ = 𝒲[k]
         for i ∈ 1:L
-            τᵢ = τ[i]*𝓂[k] #weight by 1/cos(θ)
+            τᵢ = τ[i]*𝓂ₖ #weight optical depth by 1/cos(θ)
             tᵢ = exp(-τᵢ)
             Bₑ = layerplanck(B[i], B[i+1], τᵢ, tᵢ)
             I = I*tᵢ + Bₑ
-            M⁻[i+1] += 𝒲[k]*I
+            M⁻[i+1] += 𝒲ₖ*I #quadrature weight applied to irradiance
         end
     end
 
-    #===========================================================
-    downward stellar flux, assuming absorption only, no emission
-    ===========================================================#
+    #==================================
+    absorption of downward stellar flux
+    ==================================#
     M⁻[1] += c*fS(ν) #initial flux scaled by angle
     Mₛ = M⁻[1]
     @inbounds for i ∈ 1:L
-        τᵢ = τ[i]/c
-        tᵢ = exp(-τᵢ)
-        Mₛ *= tᵢ
+        Mₛ *= exp(-τ[i]/c) #apply layer transmittance
         M⁻[i+1] += Mₛ
     end
 
@@ -308,12 +310,14 @@ function 𝒹monoflux!(M⁺, #downward monochromatic fluxes [W/m^2/cm^-1]
     M⁺[end] = Iₛ⁺*π #upward surface flux
     @inbounds for k ∈ 1:nstream
         I = Iₛ⁺
+        𝓂ₖ = 𝓂[k]
+        𝒲ₖ = 𝒲[k]
         for i ∈ L:-1:1
-            τᵢ = τ[i]*𝓂[k] #weight by 1/cos(θ)
+            τᵢ = τ[i]*𝓂ₖ #weight by 1/cos(θ)
             tᵢ = exp(-τᵢ)
             Bₑ = layerplanck(B[i+1], B[i], τᵢ, tᵢ)
             I = I*tᵢ + Bₑ
-            M⁺[i] += 𝒲[k]*I
+            M⁺[i] += 𝒲ₖ*I
         end
     end
 
