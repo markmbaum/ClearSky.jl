@@ -241,6 +241,10 @@ function CIATables(fn::String;
     CIATables(readcia(fn), extrapolate=extrapolate, singles=singles, verbose=verbose)
 end
 
+function Base.show(io::IO, t::CIATables)
+    println(io, "CIATables - $(t.name)")
+end
+
 #-------------------------------------------------------------------------------
 # interpolating k, the raw CIA values
 

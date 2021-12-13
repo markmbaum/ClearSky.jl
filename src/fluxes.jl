@@ -13,7 +13,8 @@ end
 formprofile(P, x::AbstractVector) = AtmosphericProfile(P, x)
 formprofile(::Any, x::Real) = (::Any...) -> x
 formprofile(::Any, x) = x
-formprofiles(P, X...) = map(x -> formprofile(P,x), X)
+formprofile(x::Real) = ::Any->x
+formprofiles(P, X...) = map(x->formprofile(P,x), X)
 
 #------------------------------------------------------------------------------
 export opticaldepth

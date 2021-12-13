@@ -109,7 +109,7 @@ function bake(sl::SpectralLines,
     σ = zeros(nν, Ω.nT, Ω.nP)
     #initialize progress meter if desired
     if progress
-        prg = Progress(Ω.nT*Ω.nP, 0.1, "evaluating $(sl.formula) cross-sections ")
+        prg = Progress(Ω.nT*Ω.nP, 0.1, "$(sl.formula) σ ")
     end
     #fill σ by evaluating in batches of wavenumbers (slow part)
     @threads for i ∈ eachindex(Ω.T)
@@ -213,13 +213,13 @@ struct Gas{T,F} <: AbstractGas
 end
 
 function Base.show(io::IO, g::Gas)
-    print(io, "$(g.name) ($(g.formula))\n")
-    print(io, "  μ = $(round(g.μ, sigdigits=8)) kg/mole\n")
-    print(io, "  ν: $(minimum(g.ν)) - $(maximum(g.ν)) cm^-1 ($(length(g.ν)) samples)\n")
+    println(io, "$(g.name) ($(g.formula))")
+    println(io, "  μ = $(round(g.μ, sigdigits=8)) kg/mole")
+    println(io, "  ν: $(minimum(g.ν)) - $(maximum(g.ν)) cm^-1 ($(length(g.ν)) samples)")
     Tmin, Tmax = g.Ω.Tmin, g.Ω.Tmax
     Pmin, Pmax = g.Ω.Pmin, g.Ω.Pmax
-    print(io, "  T: $Tmin - $Tmax K ($(g.Ω.nT) samples)\n")
-    print(io, "  P: $Pmin - $Pmax Pa ($(g.Ω.nP) samples)\n")
+    println(io, "  T: $Tmin - $Tmax K ($(g.Ω.nT) samples)")
+    print(io, "  P: $Pmin - $Pmax Pa ($(g.Ω.nP) samples)")
 end
 
 function Gas(sl::SpectralLines,
@@ -312,7 +312,7 @@ Create a copy of a [`Gas`](@ref) object with a new, **uniform** molar concentrat
 
     The self-broadening component of the line shape is not recomputed when using the `reconcentrate` function. This component is generally small when partial pressure is low, but may be appreciable if the concentration changes significantly.
 """
-function reconcentrate(g::Gas, C::Real)::Gas where {U,V}
+function reconcentrate(g::Gas, C::Real)::Gas
     #check for invalid concentrations
     @assert 0 <= C <= 1.0 "gas molar concentrations must be in [0,1], not $C"
     #construct a new gas WITHOUT COPYING

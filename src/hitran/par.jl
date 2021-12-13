@@ -122,7 +122,7 @@ function readpar(filename::String;
     )
     #parse the values 
     if progress
-        prg = Progress(length(lines), 0.1, "Parsing \"$(splitdir(filename)[end])\" ")
+        prg = Progress(length(lines), 0.1, "parse $(splitdir(filename)[end]) ")
     end
     @inbounds for i ∈ eachindex(lines)
         #get the line in question
