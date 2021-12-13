@@ -20,6 +20,7 @@ Cubature = "1"
 Faddeyeva985 = "1"
 ProgressMeter = "1"
 ScalarRadau = "2"
+UnPack = "1"
 julia = "1.6"
 
 [extras]
