@@ -14,17 +14,6 @@ ScalarRadau = "52145ff8-3717-48bc-b8ab-44d3704098ee"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
-<<<<<<< HEAD
-=======
-BasicInterpolators = "0.6"
-Cubature = "1"
-Faddeyeva985 = "1"
-FastGaussQuadrature = "0.4"
-Memoize = "0.4"
-ProgressMeter = "1"
-ScalarRadau = "2"
-UnPack = "1"
->>>>>>> 7ad583f133475903954fb3eca8f973369b0a972d
 julia = "1.6"
 
 [extras]
