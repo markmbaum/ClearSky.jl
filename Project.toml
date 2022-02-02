@@ -14,6 +14,7 @@ ScalarRadau = "52145ff8-3717-48bc-b8ab-44d3704098ee"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
+FastGaussQuadrature = "0.4"
 julia = "1.6"
 
 [extras]
